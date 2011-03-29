@@ -2371,6 +2371,9 @@ static int wl1271_join(struct wl1271 *wl, bool set_assoc)
 	if (test_bit(WL1271_FLAG_STA_ASSOCIATED, &wl->flags))
 		wl1271_info("JOIN while associated.");
 
+	/* clear encryption type */
+	wl->encryption_type = KEY_NONE;
+
 	if (set_assoc)
 		set_bit(WL1271_FLAG_STA_ASSOCIATED, &wl->flags);
 
@@ -3009,6 +3012,17 @@ static int wl1271_op_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
 		if (ret < 0) {
 			wl1271_error("Could not add or replace key");
 			goto out_sleep;
+		}
+
+		/* reconfiguring arp response (data packet) */
+		if (wl->bss_type == BSS_TYPE_STA_BSS &&
+		    wl->encryption_type != key_type) {
+			wl->encryption_type = key_type;
+			ret = wl1271_cmd_build_arp_rsp(wl, wl->ip_addr);
+			if (ret < 0) {
+				wl1271_warning("build arp rsp failed: %d", ret);
+				goto out_sleep;
+			}
 		}
 		break;
 
@@ -3922,6 +3936,7 @@ sta_not_found:
 
 		if (bss_conf->arp_addr_cnt == 1 &&
 		    bss_conf->arp_filter_enabled) {
+			wl->ip_addr = addr;
 			/*
 			 * The template should have been configured only upon
 			 * association. however, it seems that the correct ip
@@ -3937,8 +3952,10 @@ sta_not_found:
 			ret = wl1271_acx_arp_ip_filter(wl,
 				ACX_ARP_FILTER_ARP_FILTERING,
 				addr);
-		} else
+		} else {
+			wl->ip_addr = 0;
 			ret = wl1271_acx_arp_ip_filter(wl, 0, addr);
+		}
 
 		if (ret < 0)
 			goto out;
@@ -5011,7 +5028,7 @@ int wl1271_init_ieee80211(struct wl1271 *wl)
 	};
 
 	/* The tx descriptor buffer and the TKIP space. */
-	wl->hw->extra_tx_headroom = WL1271_TKIP_IV_SPACE +
+	wl->hw->extra_tx_headroom = WL1271_EXTRA_SPACE_TKIP +
 		sizeof(struct wl1271_tx_hw_descr);
 
 	/* unit us */

@@ -658,6 +658,10 @@ struct wl1271 {
 	/* bands supported by this instance of wl12xx */
 	struct ieee80211_supported_band bands[IEEE80211_NUM_BANDS];
 
+	/* save the current encryption type for auto-arp config*/
+	u8 encryption_type;
+	__be32 ip_addr;
+
 	/* RX BA constraint value */
 	bool ba_support;
 	u8 ba_rx_bitmap;
