@@ -1528,13 +1528,16 @@ static int __wl1271_plt_stop(struct wl1271 *wl)
 		goto out;
 	}
 
+	mutex_unlock(&wl->mutex);
+	wl1271_disable_interrupts(wl);
+	mutex_lock(&wl->mutex);
+
 	wl1271_power_off(wl);
 
 	wl->state = WL1271_STATE_OFF;
 	wl->rx_counter = 0;
 
 	mutex_unlock(&wl->mutex);
-	wl1271_disable_interrupts(wl);
 	wl1271_flush_deferred_work(wl);
 	cancel_work_sync(&wl->netstack_work);
 	cancel_work_sync(&wl->recovery_work);
@@ -2310,11 +2313,19 @@ static void __wl1271_op_remove_interface(struct wl1271 *wl,
 	 * this must be before the cancel_work calls below, so that the work
 	 * functions don't perform further work.
 	 */
-	wl->state = WL1271_STATE_OFF;
-
 	mutex_unlock(&wl->mutex);
 
+	/*
+	 * Interrupts must be disabled before setting the state to OFF.
+	 * Otherwise, the interrupt handler might be called and exit without
+	 * reading the interrupt status.
+	 */
 	wl1271_disable_interrupts(wl);
+
+	mutex_lock(&wl->mutex);
+	wl->state = WL1271_STATE_OFF;
+	mutex_unlock(&wl->mutex);
+
 	wl1271_flush_deferred_work(wl);
 	cancel_delayed_work_sync(&wl->scan_complete_work);
 	cancel_work_sync(&wl->netstack_work);
