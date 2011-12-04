@@ -2466,12 +2466,6 @@ static int wl1271_sta_handle_idle(struct wl1271 *wl, bool idle)
 			goto out;
 		set_bit(WL1271_FLAG_IDLE, &wl->flags);
 	} else {
-		/* The current firmware only supports sched_scan in idle */
-		if (wl->sched_scanning) {
-			wl1271_scan_sched_scan_stop(wl);
-			ieee80211_sched_scan_stopped(wl->hw);
-		}
-
 		ret = wl1271_cmd_role_start_dev(wl);
 		if (ret < 0)
 			goto out;
