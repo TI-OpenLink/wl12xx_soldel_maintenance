@@ -1730,7 +1730,7 @@ static int wl1271_configure_wowlan(struct wl1271 *wl,
 		/* WoWLAN triggers as defined by nl80211 does not match wl12xx's
 		   capabilities 1:1 so it's possible to get a pattern that
 		   FW cannot handle */
-		if (wl1271_count_bit_flips(p->mask, p->pattern_len) > 1) {
+		if (wl1271_count_bit_flips(p->mask, p->pattern_len) > 15) {
 			wl1271_warning("WoWLAN pattern too advanced\n");
 			goto err;
 		}
