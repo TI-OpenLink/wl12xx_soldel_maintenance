@@ -3091,8 +3091,6 @@ static int wl1271_op_hw_scan(struct ieee80211_hw *hw,
 			ret = -EBUSY;
 			goto out_sleep;
 		}
-		wl1271_croc(wl, wl->dev_role_id);
-		wl1271_cmd_role_stop_dev(wl);
 	}
 
 	ret = wl1271_scan(hw->priv, ssid, len, req);
@@ -5048,7 +5046,8 @@ int wl1271_init_ieee80211(struct wl1271 *wl)
 		IEEE80211_HW_SPECTRUM_MGMT |
 		IEEE80211_HW_AP_LINK_PS |
 		IEEE80211_HW_AMPDU_AGGREGATION |
-		IEEE80211_HW_TX_AMPDU_IN_HW_ONLY;
+		IEEE80211_HW_TX_AMPDU_IN_HW_ONLY |
+		IEEE80211_HW_SCAN_WHILE_IDLE;
 
 	wl->hw->wiphy->cipher_suites = cipher_suites;
 	wl->hw->wiphy->n_cipher_suites = ARRAY_SIZE(cipher_suites);
