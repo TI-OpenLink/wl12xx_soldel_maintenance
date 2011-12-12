@@ -422,9 +422,6 @@ static int ieee80211_ifa_changed(struct notifier_block *nb,
 	sdata = IEEE80211_DEV_TO_SUB_IF(ndev);
 	bss_conf = &sdata->vif.bss_conf;
 
-	if (!ieee80211_sdata_running(sdata))
-		return NOTIFY_DONE;
-
 	/* ARP filtering is only supported in managed mode */
 	if (sdata->vif.type != NL80211_IFTYPE_STATION)
 		return NOTIFY_DONE;
