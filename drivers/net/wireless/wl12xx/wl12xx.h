@@ -671,6 +671,7 @@ struct wl1271 {
 	/* save the current encryption type for auto-arp config*/
 	u8 encryption_type;
 	__be32 ip_addr;
+	bool qos;
 
 	/* RX BA constraint value */
 	bool ba_support;

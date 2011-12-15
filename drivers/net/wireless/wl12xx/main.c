@@ -4103,8 +4103,10 @@ sta_not_found:
 	}
 
 	/* Handle arp filtering. Done after join. */
-	if (changed & BSS_CHANGED_ARP_FILTER) {
+	if ((changed & BSS_CHANGED_ARP_FILTER) ||
+	    (!is_ibss && (changed & BSS_CHANGED_QOS))) {
 		__be32 addr = bss_conf->arp_addr_list[0];
+		wl->qos = bss_conf->qos;
 		WARN_ON(wl->bss_type != BSS_TYPE_STA_BSS);
 
 		if (bss_conf->arp_addr_cnt == 1 &&

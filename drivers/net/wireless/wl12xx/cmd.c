@@ -1204,7 +1204,7 @@ int wl1271_cmd_build_arp_rsp(struct wl1271 *wl, __be32 ip_addr)
 	struct ieee80211_hdr_3addr *hdr;
 	struct arphdr *arp_hdr;
 
-	skb = dev_alloc_skb(sizeof(*hdr) + sizeof(*tmpl) +
+	skb = dev_alloc_skb(sizeof(*hdr) + sizeof(__le16) + sizeof(*tmpl) +
 			    WL1271_EXTRA_SPACE_MAX);
 	if (!skb) {
 		wl1271_error("failed to allocate buffer for arp rsp template");
@@ -1257,10 +1257,18 @@ int wl1271_cmd_build_arp_rsp(struct wl1271 *wl, __be32 ip_addr)
 		memset(space, 0, extra);
 	}
 
+	/* QoS header - BE */
+	if (wl->qos)
+		memset(skb_push(skb, sizeof(__le16)), 0, sizeof(__le16));
+
 	/* mac80211 header */
 	hdr = (struct ieee80211_hdr_3addr *)skb_push(skb, sizeof(*hdr));
 	memset(hdr, 0, sizeof(hdr));
-	fc = IEEE80211_FTYPE_DATA | IEEE80211_STYPE_DATA | IEEE80211_FCTL_TODS;
+	fc = IEEE80211_FTYPE_DATA | IEEE80211_FCTL_TODS;
+	if (wl->qos)
+		fc |= IEEE80211_STYPE_QOS_DATA;
+	else
+		fc |= IEEE80211_STYPE_DATA;
 	if (wl->encryption_type != KEY_NONE)
 		fc |= IEEE80211_FCTL_PROTECTED;
 
