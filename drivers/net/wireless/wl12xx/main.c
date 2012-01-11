@@ -2580,7 +2580,7 @@ static int wl1271_op_config(struct ieee80211_hw *hw, u32 changed)
 	struct wl1271 *wl = hw->priv;
 	struct ieee80211_conf *conf = &hw->conf;
 	int channel, ret = 0;
-	bool is_ap;
+	bool is_ap, is_sta;
 
 	channel = ieee80211_frequency_to_channel(conf->channel->center_freq);
 
@@ -2617,6 +2617,7 @@ static int wl1271_op_config(struct ieee80211_hw *hw, u32 changed)
 	}
 
 	is_ap = (wl->bss_type == BSS_TYPE_AP_BSS);
+	is_sta = (wl->bss_type == BSS_TYPE_STA_BSS);
 
 	ret = wl1271_ps_elp_wakeup(wl);
 	if (ret < 0)
@@ -2680,7 +2681,7 @@ static int wl1271_op_config(struct ieee80211_hw *hw, u32 changed)
 		}
 	}
 
-	if (changed & IEEE80211_CONF_CHANGE_IDLE && !is_ap) {
+	if (changed & IEEE80211_CONF_CHANGE_IDLE && is_sta) {
 		ret = wl1271_sta_handle_idle(wl,
 					conf->flags & IEEE80211_CONF_IDLE);
 		if (ret < 0)
@@ -3802,11 +3803,8 @@ static void wl1271_bss_info_changed_sta(struct wl1271 *wl,
 			ibss_joined = true;
 		} else {
 			if (test_and_clear_bit(WL1271_FLAG_IBSS_JOINED,
-					       &wl->flags)) {
+					       &wl->flags))
 				wl1271_unjoin(wl);
-				wl1271_cmd_role_start_dev(wl);
-				wl1271_roc(wl, wl->dev_role_id);
-			}
 		}
 	}
 
