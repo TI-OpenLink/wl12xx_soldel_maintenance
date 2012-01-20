@@ -2268,6 +2268,11 @@ static void __wl1271_op_remove_interface(struct wl1271 *wl,
 	if (wl->state != WL1271_STATE_ON)
 		return;
 
+	/* Protect from re-entry that can happen if recovery is triggered while
+	   this op is running */
+	if (test_and_set_bit(WL1271_FLAG_HW_GOING_DOWN, &wl->flags))
+		return;
+
 	wl1271_info("down");
 
 	mutex_lock(&wl_list_mutex);
