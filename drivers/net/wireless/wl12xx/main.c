@@ -2998,11 +2998,8 @@ static int wl1271_set_key(struct wl1271 *wl, u16 action, u8 id, u8 key_type,
 		 * A STA set to GEM cipher requires 2 tx spare blocks.
 		 * Return to default value when GEM cipher key is removed
 		 */
-		if (key_type == KEY_GEM) {
-			if (action == KEY_ADD_OR_REPLACE)
+		if (key_type == KEY_GEM && action == KEY_ADD_OR_REPLACE) {
 				wl->tx_spare_blocks = 2;
-			else if (action == KEY_REMOVE)
-				wl->tx_spare_blocks = TX_HW_BLOCK_SPARE_DEFAULT;
 		}
 
 		addr = sta ? sta->addr : bcast_addr;

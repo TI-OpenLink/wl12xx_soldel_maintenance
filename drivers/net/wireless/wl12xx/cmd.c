@@ -557,7 +557,7 @@ int wl1271_cmd_role_stop_dev(struct wl1271 *wl)
 		wl1271_error("cmd role stop dev event completion error");
 		goto out_free;
 	}
-
+	wl->tx_spare_blocks = TX_HW_BLOCK_SPARE_DEFAULT;
 	wl1271_free_link(wl, &wl->dev_hlid);
 
 out_free:
