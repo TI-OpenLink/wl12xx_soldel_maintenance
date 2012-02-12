@@ -4357,6 +4357,23 @@ void wl1271_free_sta(struct wl1271 *wl, u8 hlid)
 	wl->active_sta_count--;
 }
 
+static int wl12xx_sta_authorize(struct wl1271 *wl,
+				struct ieee80211_sta *sta)
+{
+	struct wl1271_station *wl_sta;
+	int ret;
+
+	wl_sta = (struct wl1271_station *)sta->drv_priv;
+	if (wl_sta->authorized)
+		return -EALREADY;
+
+	ret = wl1271_acx_set_ht_capabilities(wl, &sta->ht_cap, true,
+					     wl_sta->hlid);
+	wl_sta->authorized = true;
+
+	return ret;
+}
+
 static int wl1271_op_sta_add_locked(struct ieee80211_hw *hw,
 				    struct ieee80211_vif *vif,
 				    struct ieee80211_sta *sta)
@@ -4377,9 +4394,11 @@ static int wl1271_op_sta_add_locked(struct ieee80211_hw *hw,
 	if (ret < 0)
 		goto out;
 
-	ret = wl1271_acx_set_ht_capabilities(wl, &sta->ht_cap, true, hlid);
-	if (ret < 0)
-		goto out;
+	if (sta->authorized) {
+		ret = wl12xx_sta_authorize(wl, sta);
+		if (ret < 0)
+			goto out;
+	}
 
 	wl_sta = (struct wl1271_station *)sta->drv_priv;
 	wl_sta->added = true;
@@ -4390,6 +4409,27 @@ out:
 	return ret;
 }
 
+static void wl12xx_op_sta_authorize(struct ieee80211_hw *hw,
+				    struct ieee80211_vif *vif,
+				    struct ieee80211_sta *sta)
+{
+	struct wl1271 *wl = hw->priv;
+	int ret;
+
+	wl1271_debug(DEBUG_MAC80211, "mac80211 auth sta %d", (int)sta->aid);
+	mutex_lock(&wl->mutex);
+
+	ret = wl1271_ps_elp_wakeup(wl);
+	if (ret < 0)
+		goto out;
+
+	ret = wl12xx_sta_authorize(wl, sta);
+
+	wl1271_ps_elp_sleep(wl);
+out:
+	mutex_unlock(&wl->mutex);
+
+}
 static int wl1271_op_sta_add(struct ieee80211_hw *hw,
 			     struct ieee80211_vif *vif,
 			     struct ieee80211_sta *sta)
@@ -4909,6 +4949,7 @@ static const struct ieee80211_ops wl1271_ops = {
 	.get_survey = wl1271_op_get_survey,
 	.sta_add = wl1271_op_sta_add,
 	.sta_remove = wl1271_op_sta_remove,
+	.sta_authorize = wl12xx_op_sta_authorize,
 	.ampdu_action = wl1271_op_ampdu_action,
 	.tx_frames_pending = wl1271_tx_frames_pending,
 	.channel_switch = wl12xx_op_channel_switch,

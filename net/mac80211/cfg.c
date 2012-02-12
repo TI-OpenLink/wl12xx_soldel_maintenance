@@ -662,8 +662,11 @@ static void sta_apply_parameters(struct ieee80211_local *local,
 
 	if (mask & BIT(NL80211_STA_FLAG_AUTHORIZED)) {
 		sta->flags &= ~WLAN_STA_AUTHORIZED;
-		if (set & BIT(NL80211_STA_FLAG_AUTHORIZED))
+		sta->sta.authorized = false;
+		if (set & BIT(NL80211_STA_FLAG_AUTHORIZED)) {
 			sta->flags |= WLAN_STA_AUTHORIZED;
+			sta->sta.authorized = true;
+		}
 	}
 
 	if (mask & BIT(NL80211_STA_FLAG_SHORT_PREAMBLE)) {
@@ -912,6 +915,15 @@ static int ieee80211_change_station(struct wiphy *wiphy,
 	sta_apply_parameters(local, sta, params);
 
 	rcu_read_unlock();
+
+	if (!is_dummy &&
+	    (params->sta_flags_mask & BIT(NL80211_STA_FLAG_AUTHORIZED)) &&
+	    (params->sta_flags_set & BIT(NL80211_STA_FLAG_AUTHORIZED))) {
+		mutex_lock(&sdata->local->sta_mtx);
+		drv_sta_authorize(local, sdata, &sta->sta);
+		mutex_unlock(&sdata->local->sta_mtx);
+	}
+
 	if (is_dummy &&
 	    (params->sta_flags_mask & BIT(NL80211_STA_FLAG_PRE_ASSOC)) &&
 	    !(params->sta_flags_set & BIT(NL80211_STA_FLAG_PRE_ASSOC)))
