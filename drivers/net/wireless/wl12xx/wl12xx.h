@@ -571,6 +571,10 @@ struct wl12xx_vif {
 			u8 p2p_rate_idx;
 
 			bool qos;
+
+			/* first and last beacon loss times */
+			unsigned long first_bcn_loss;
+			unsigned long last_bcn_loss;
 		} sta;
 		struct {
 			u8 global_hlid;

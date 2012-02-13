@@ -4093,6 +4093,8 @@ sta_not_found:
 			wl1271_ssid_set(vif, wlvif->probereq, ieoffset);
 
 			/* enable the connection monitoring feature */
+			wlvif->sta.first_bcn_loss = 0;
+			wlvif->sta.last_bcn_loss = 0;
 			ret = wl1271_acx_conn_monit_params(wl, wlvif, true);
 			if (ret < 0)
 				goto out;

@@ -30,6 +30,18 @@
 #include "scan.h"
 #include "wl12xx_80211.h"
 
+/*
+ * max time between beacon loss events in which they are still
+ * considered consecutive (and a new message won't be generated)
+ */
+#define WL12XX_MAX_CONS_BCN_LOSS_TIME		(5 * HZ)
+
+/*
+ * max handling time for beacon loss events, before a connection
+ * loss event will be sent
+ */
+#define WL12XX_MAX_BCN_LOSS_HANDLING_TIME	(20 * HZ)
+
 static void wl1271_event_rssi_trigger(struct wl1271 *wl,
 				      struct wl12xx_vif *wlvif,
 				      struct event_mailbox *mbox)
@@ -257,12 +269,31 @@ static int wl1271_event_process(struct wl1271 *wl, struct event_mailbox *mbox)
 		}
 	}
 
-	if (beacon_loss)
+	if (beacon_loss) {
+		unsigned long now = jiffies;
 		wl12xx_for_each_wlvif_sta(wl, wlvif) {
 			vif = wl12xx_wlvif_to_vif(wlvif);
-			ieee80211_connection_loss(vif);
-		}
 
+			/* check for consecutive beacon loss events */
+			if (!wlvif->sta.last_bcn_loss ||
+			    time_after(now,
+				       wlvif->sta.last_bcn_loss +
+				       WL12XX_MAX_CONS_BCN_LOSS_TIME)) {
+				/* first beacon loss */
+				wlvif->sta.first_bcn_loss = now;
+				ieee80211_cqm_rssi_notify(
+					vif,
+					NL80211_CQM_RSSI_BEACON_LOSS,
+					GFP_KERNEL);
+
+			} else if (time_after(now,
+					wlvif->sta.first_bcn_loss +
+					WL12XX_MAX_BCN_LOSS_HANDLING_TIME)) {
+				ieee80211_connection_loss(vif);
+			}
+			wlvif->sta.last_bcn_loss = now;
+		}
+	}
 	return 0;
 }
 
