@@ -3383,6 +3383,7 @@ static int wl1271_op_hw_scan(struct ieee80211_hw *hw,
 			     struct cfg80211_scan_request *req)
 {
 	struct wl1271 *wl = hw->priv;
+	struct wl12xx_vif *wlvif = wl12xx_vif_to_data(vif);
 	int ret;
 	u8 *ssid = NULL;
 	size_t len = 0;
@@ -3396,7 +3397,7 @@ static int wl1271_op_hw_scan(struct ieee80211_hw *hw,
 
 	mutex_lock(&wl->mutex);
 
-	if (wl->state == WL1271_STATE_OFF) {
+	if (!test_bit(WLVIF_FLAG_INITIALIZED, &wlvif->flags)) {
 		/*
 		 * We cannot return -EBUSY here because cfg80211 will expect
 		 * a call to ieee80211_scan_completed if we do - in this case
