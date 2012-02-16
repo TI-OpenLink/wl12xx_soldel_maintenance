@@ -534,6 +534,13 @@ void ieee80211_sta_process_chanswitch(struct ieee80211_sub_if_data *sdata,
 	}
 }
 
+void ieee80211_get_current_rssi(struct ieee80211_sub_if_data *sdata,
+				struct station_info *sinfo)
+{
+	struct ieee80211_local *local = sdata->local;
+	drv_get_current_rssi(local, sdata, &sdata->vif.bss_conf, sinfo);
+}
+
 static void ieee80211_handle_pwr_constr(struct ieee80211_sub_if_data *sdata,
 					u16 capab_info, u8 *pwr_constr_elem,
 					u8 pwr_constr_elem_len)

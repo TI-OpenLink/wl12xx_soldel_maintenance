@@ -1162,6 +1162,9 @@ void ieee80211_sta_process_chanswitch(struct ieee80211_sub_if_data *sdata,
 				      struct ieee80211_channel_sw_ie *sw_elem,
 				      struct ieee80211_bss *bss,
 				      u64 timestamp);
+void ieee80211_get_current_rssi(struct ieee80211_sub_if_data *sdata,
+				struct station_info *sinfo);
+
 void ieee80211_sta_quiesce(struct ieee80211_sub_if_data *sdata);
 void ieee80211_sta_restart(struct ieee80211_sub_if_data *sdata);
 void ieee80211_sta_work(struct ieee80211_sub_if_data *sdata);

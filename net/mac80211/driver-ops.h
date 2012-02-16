@@ -813,4 +813,16 @@ drv_set_default_unicast_key(struct ieee80211_local *local,
 
 	return ret;
 }
+
+static inline void drv_get_current_rssi(struct ieee80211_local *local,
+					struct ieee80211_sub_if_data *sdata,
+					struct ieee80211_bss_conf *info,
+					struct station_info *sinfo)
+{
+	if (local->ops->get_current_rssi)
+		local->ops->get_current_rssi(&local->hw, &sdata->vif, sinfo);
+
+	trace_drv_return_void(local);
+}
+
 #endif /* __MAC80211_DRIVER_OPS */
