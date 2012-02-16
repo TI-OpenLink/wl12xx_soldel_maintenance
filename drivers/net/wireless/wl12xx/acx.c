@@ -1845,3 +1845,32 @@ out:
 	kfree(acx);
 	return ret;
 }
+
+int wl12xx_acx_sta_get_rssi(struct wl1271 *wl, struct wl12xx_vif *wlvif,
+			    int *rssi)
+{
+	struct wl12xx_acx_roaming_statistics *stat_info;
+	int ret;
+
+	wl1271_debug(DEBUG_ACX, "acx roaming statistics table");
+
+	stat_info = kzalloc(sizeof(*stat_info), GFP_KERNEL);
+	if (!stat_info)
+		return -ENOMEM;
+
+	stat_info->role_id = wlvif->role_id;
+
+	ret = wl1271_cmd_interrogate(wl, ACX_ROAMING_STATISTICS_TBL,
+				     stat_info, sizeof(*stat_info));
+	if (ret < 0) {
+		wl1271_warning("Reading acx roaming statistics"
+			       " table failed: %d", ret);
+		goto out;
+	}
+
+	*rssi = stat_info->rssi_beacon;
+
+out:
+	kfree(stat_info);
+	return ret;
+}

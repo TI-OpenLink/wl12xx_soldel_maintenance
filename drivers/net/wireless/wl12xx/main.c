@@ -4326,6 +4326,42 @@ out:
 	mutex_unlock(&wl->mutex);
 }
 
+static void wl1271_op_get_current_rssi(struct ieee80211_hw *hw,
+				       struct ieee80211_vif *vif,
+				       struct station_info *sinfo)
+{
+	struct wl1271 *wl = hw->priv;
+	struct wl12xx_vif *wlvif = wl12xx_vif_to_data(vif);
+	int rssi = 0;
+	int ret;
+
+	wl1271_debug(DEBUG_MAC80211, "mac80211 get current rssi");
+
+	mutex_lock(&wl->mutex);
+
+	if (unlikely(wl->state == WL1271_STATE_OFF))
+		goto out;
+
+	if (wlvif->bss_type != BSS_TYPE_STA_BSS)
+		goto out;
+
+	ret = wl1271_ps_elp_wakeup(wl);
+	if (ret < 0)
+		goto out;
+
+	ret = wl12xx_acx_sta_get_rssi(wl, wlvif, &rssi);
+	if (ret < 0)
+		goto out_sleep;
+
+	sinfo->signal = (s8)rssi;
+
+out_sleep:
+	wl1271_ps_elp_sleep(wl);
+
+out:
+	mutex_unlock(&wl->mutex);
+}
+
 static int wl1271_op_conf_tx(struct ieee80211_hw *hw,
 			     struct ieee80211_vif *vif, u16 queue,
 			     const struct ieee80211_tx_queue_params *params)
@@ -5076,6 +5112,7 @@ static const struct ieee80211_ops wl1271_ops = {
 	.set_bitrate_mask = wl12xx_set_bitrate_mask,
 	.channel_switch = wl12xx_op_channel_switch,
 	.set_default_key_idx = wl1271_op_set_default_key_idx,
+	.get_current_rssi = wl1271_op_get_current_rssi,
 	CFG80211_TESTMODE_CMD(wl1271_tm_cmd)
 };
 
