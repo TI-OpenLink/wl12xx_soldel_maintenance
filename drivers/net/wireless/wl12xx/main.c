@@ -236,6 +236,8 @@ static struct conf_drv_settings default_conf = {
 		},
 		.synch_fail_thold            = 10,
 		.bss_lose_timeout            = 100,
+		.cons_bcn_loss_time          = 5000,
+		.max_bcn_loss_time           = 10000,
 		.beacon_rx_timeout           = 10000,
 		.broadcast_timeout           = 20000,
 		.rx_broadcast_in_ps          = 1,
