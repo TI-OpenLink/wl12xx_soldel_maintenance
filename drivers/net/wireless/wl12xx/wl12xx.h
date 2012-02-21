@@ -295,7 +295,7 @@ struct wl1271_link {
 	u8 ba_bitmap;
 };
 
-#define WL1271_MAX_RX_DATA_FILTERS 4
+#define WL1271_MAX_RX_DATA_FILTERS 5
 #define WL1271_RX_DATA_FILTER_MAX_FIELD_PATTERNS 8
 
 /* FW MAX FILTER SIZE is 98 bytes. The MAX_PATTERN_SIZE is imposed
