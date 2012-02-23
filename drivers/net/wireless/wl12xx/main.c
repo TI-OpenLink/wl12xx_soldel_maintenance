@@ -1780,13 +1780,14 @@ static int wl1271_configure_wowlan(struct wl1271 *wl,
 {
 	int i, ret;
 
-	if (!wow) {
-		wl1271_rx_data_filtering_enable(wl, 0, FILTER_SIGNAL);
-		wl1271_rx_data_filters_clear_all(wl);
+	wl1271_rx_data_filtering_enable(wl, 0, FILTER_SIGNAL);
+	wl1271_rx_data_filters_clear_all(wl);
+
+	if (!wow)
 		return 0;
-	}
 
 	WARN_ON(wow->n_patterns > WL1271_MAX_RX_DATA_FILTERS);
+
 	if (wow->any || !wow->n_patterns)
 		return 0;
 
@@ -1845,10 +1846,6 @@ static int wl1271_configure_suspend_sta(struct wl1271 *wl,
 	ret = wl1271_ps_elp_wakeup(wl);
 	if (ret < 0)
 		goto out_unlock;
-
-	ret = wl1271_configure_wowlan(wl, wow);
-	if (ret < 0)
-		wl1271_error("suspend: Could not configure WoWLAN: %d", ret);
 
 	ret = wl1271_acx_wake_up_conditions(wl, wlvif,
 				    wl->conf.conn.suspend_wake_up_event,
@@ -1916,9 +1913,6 @@ static void wl1271_configure_resume(struct wl1271 *wl,
 		goto out;
 
 	if (is_sta) {
-		/* Remove WoWLAN filtering */
-		wl1271_configure_wowlan(wl, NULL);
-
 		ret = wl1271_acx_wake_up_conditions(wl, wlvif,
 				    wl->conf.conn.wake_up_event,
 				    wl->conf.conn.listen_interval);
@@ -2544,6 +2538,8 @@ deinit:
 		wl12xx_free_rate_policy(wl, &wlvif->sta.basic_rate_idx);
 		wl12xx_free_rate_policy(wl, &wlvif->sta.ap_rate_idx);
 		wl12xx_free_rate_policy(wl, &wlvif->sta.p2p_rate_idx);
+		wl1271_rx_data_filtering_enable(wl, 0, FILTER_SIGNAL);
+		wl1271_rx_data_filters_clear_all(wl);
 	} else {
 		wlvif->ap.bcast_hlid = WL12XX_INVALID_LINK_ID;
 		wlvif->ap.global_hlid = WL12XX_INVALID_LINK_ID;
@@ -4368,6 +4364,32 @@ out:
 	mutex_unlock(&wl->mutex);
 }
 
+static int wl12xx_op_set_rx_filters(struct ieee80211_hw *hw,
+				    struct cfg80211_wowlan *wowlan)
+{
+	struct wl1271 *wl = hw->priv;
+	int ret = 0;
+
+	mutex_lock(&wl->mutex);
+
+	wl1271_debug(DEBUG_MAC80211, "mac80211 set rx filters");
+
+	if (unlikely(wl->state == WL1271_STATE_OFF))
+		goto out;
+
+	ret = wl1271_ps_elp_wakeup(wl);
+	if (ret < 0)
+		goto out;
+
+	ret = wl1271_configure_wowlan(wl, wowlan);
+
+	wl1271_ps_elp_sleep(wl);
+out:
+	mutex_unlock(&wl->mutex);
+
+	return ret;
+}
+
 static int wl1271_op_conf_tx(struct ieee80211_hw *hw,
 			     struct ieee80211_vif *vif, u16 queue,
 			     const struct ieee80211_tx_queue_params *params)
@@ -5119,6 +5141,7 @@ static const struct ieee80211_ops wl1271_ops = {
 	.channel_switch = wl12xx_op_channel_switch,
 	.set_default_key_idx = wl1271_op_set_default_key_idx,
 	.get_current_rssi = wl1271_op_get_current_rssi,
+	.set_rx_filters = wl12xx_op_set_rx_filters,
 	CFG80211_TESTMODE_CMD(wl1271_tm_cmd)
 };
 
@@ -5486,7 +5509,8 @@ static int wl1271_init_ieee80211(struct wl1271 *wl)
 		IEEE80211_HW_AP_LINK_PS |
 		IEEE80211_HW_AMPDU_AGGREGATION |
 		IEEE80211_HW_TX_AMPDU_SETUP_IN_HW |
-		IEEE80211_HW_SCAN_WHILE_IDLE;
+		IEEE80211_HW_SCAN_WHILE_IDLE |
+		IEEE80211_HW_SUPPORTS_RX_FILTERS;
 
 	wl->hw->wiphy->cipher_suites = cipher_suites;
 	wl->hw->wiphy->n_cipher_suites = ARRAY_SIZE(cipher_suites);
