@@ -1877,6 +1877,17 @@ static int ieee80211_set_power_mgmt(struct wiphy *wiphy, struct net_device *dev,
 	return 0;
 }
 
+static int ieee80211_set_rx_filters(struct wiphy *wiphy,
+				    struct cfg80211_wowlan *wowlan)
+{
+	struct ieee80211_local *local = wiphy_priv(wiphy);
+
+	if (!(local->hw.flags & IEEE80211_HW_SUPPORTS_RX_FILTERS))
+		return 0;
+
+	return drv_set_rx_filters(local, wowlan);
+}
+
 static int ieee80211_set_cqm_rssi_config(struct wiphy *wiphy,
 					 struct net_device *dev,
 					 s32 rssi_thold, u32 rssi_hyst)
@@ -2775,4 +2786,5 @@ struct cfg80211_ops mac80211_config_ops = {
 	.probe_client = ieee80211_probe_client,
 	.get_channel = ieee80211_wiphy_get_channel,
 	.set_noack_map = ieee80211_set_noack_map,
+	.set_rx_filters = ieee80211_set_rx_filters,
 };
