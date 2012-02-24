@@ -1192,7 +1192,7 @@ struct acx_rx_data_filter_cfg {
 
 	u8 num_fields;
 
-	struct wl12xx_rx_data_filter_field fields[0];
+	u8 fields[0];
 } __packed;
 
 enum {
