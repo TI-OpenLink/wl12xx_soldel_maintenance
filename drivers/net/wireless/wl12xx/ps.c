@@ -27,7 +27,7 @@
 #include "io.h"
 #include "tx.h"
 
-#define WL1271_WAKEUP_TIMEOUT 500
+#define WL1271_WAKEUP_TIMEOUT 2000 //500
 
 void wl1271_elp_work(struct work_struct *work)
 {
@@ -129,6 +129,10 @@ int wl1271_ps_elp_wakeup(struct wl1271 *wl)
 	}
 
 	clear_bit(WL1271_FLAG_IN_ELP, &wl->flags);
+
+	if(jiffies_to_msecs(jiffies - start_time) > 500)
+		wl1271_info("wakeup time: %u ms",
+			jiffies_to_msecs(jiffies - start_time));
 
 	wl1271_debug(DEBUG_PSM, "wakeup time: %u ms",
 		     jiffies_to_msecs(jiffies - start_time));

@@ -87,6 +87,10 @@ int wl1271_cmd_send(struct wl1271 *wl, u16 id, void *buf, size_t len,
 		intr = wl1271_read32(wl, ACX_REG_INTERRUPT_NO_CLEAR);
 	}
 
+	if(jiffies_to_msecs(timeout - jiffies) < 1000)
+		wl1271_info("command complete time: %u ms",
+			WL1271_COMMAND_TIMEOUT - jiffies_to_msecs (timeout - jiffies));
+
 	/* read back the status code of the command */
 	if (res_len == 0)
 		res_len = sizeof(struct wl1271_cmd_header);
@@ -346,6 +350,10 @@ static int wl1271_cmd_wait_for_event_or_timeout(struct wl1271 *wl, u32 mask)
 			    sizeof(events_vector), false);
 		event |= events_vector & mask;
 	} while (!event);
+
+	if(jiffies_to_msecs(timeout - jiffies) < 1250)
+		wl1271_info("completion event time: %u ms",
+			WL1271_EVENT_TIMEOUT - jiffies_to_msecs (timeout - jiffies));
 
 	return 0;
 }
