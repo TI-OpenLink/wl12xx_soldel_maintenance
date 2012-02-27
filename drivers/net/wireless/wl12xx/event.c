@@ -264,6 +264,12 @@ static int wl1271_event_process(struct wl1271 *wl, struct event_mailbox *mbox)
 		wl12xx_for_each_wlvif_sta(wl, wlvif) {
 			vif = wl12xx_wlvif_to_vif(wlvif);
 
+			/* no roaming for p2p connection */
+			if (wlvif->p2p) {
+				ieee80211_connection_loss(vif);
+				continue;
+			}
+
 			/* check for consecutive beacon loss events */
 			if (!wlvif->sta.last_bcn_loss ||
 			    time_after(now,
