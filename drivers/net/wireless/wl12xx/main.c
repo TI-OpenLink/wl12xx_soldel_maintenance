@@ -4038,6 +4038,25 @@ static void wl1271_bss_info_changed_ap(struct wl1271 *wl,
 		}
 	}
 
+	if (!list_empty(&wl->peers_list) &&
+	    test_bit(WLVIF_FLAG_AP_STARTED, &wlvif->flags)) {
+		struct ap_peers *peer, *next;
+		enum ieee80211_sta_state state = IEEE80211_STA_NONE;
+
+		list_for_each_entry_safe(peer, next, &wl->peers_list, list) {
+			wl1271_op_sta_add_locked(peer->hw, peer->vif,
+						 &peer->sta);
+			while (state < peer->sta.state)
+				wl12xx_update_sta_state(wl, &peer->sta,
+							++state);
+
+			wl1271_debug(DEBUG_AP, "add sta %pM", peer->sta.addr);
+			list_del(&peer->list);
+			kfree(peer);
+		}
+	}
+
+
 out:
 	return;
 }
@@ -4615,16 +4634,20 @@ void wl1271_free_sta(struct wl1271 *wl, struct wl12xx_vif *wlvif, u8 hlid)
 
 	clear_bit(hlid, wlvif->ap.sta_hlid_map);
 	memset(wl->links[hlid].addr, 0, ETH_ALEN);
-	wl->links[hlid].ba_bitmap = 0;
+
+	/* mac will send DELBA after recovery */
+	if (!test_bit(WL1271_FLAG_RECOVERY_IN_PROGRESS, &wl->flags))
+		wl->links[hlid].ba_bitmap = 0;
+
 	__clear_bit(hlid, &wl->ap_ps_map);
 	__clear_bit(hlid, (unsigned long *)&wl->ap_fw_ps_map);
 	wl12xx_free_link(wl, wlvif, &hlid);
 	wl->active_sta_count--;
 }
 
-static void wl12xx_update_sta_state(struct wl1271 *wl,
-				    struct ieee80211_sta *sta,
-				    enum ieee80211_sta_state state)
+void wl12xx_update_sta_state(struct wl1271 *wl,
+			     struct ieee80211_sta *sta,
+			     enum ieee80211_sta_state state)
 {
 	struct wl1271_station *wl_sta;
 	u8 hlid;
@@ -4645,7 +4668,7 @@ static void wl12xx_update_sta_state(struct wl1271 *wl,
 	}
 }
 
-static int wl1271_op_sta_add(struct ieee80211_hw *hw,
+int wl1271_op_sta_add_locked(struct ieee80211_hw *hw,
 			     struct ieee80211_vif *vif,
 			     struct ieee80211_sta *sta)
 {
@@ -4654,6 +4677,41 @@ static int wl1271_op_sta_add(struct ieee80211_hw *hw,
 	struct wl1271_station *wl_sta;
 	int ret = 0;
 	u8 hlid;
+	struct ap_peers *new_peer;
+
+	if (!test_bit(WLVIF_FLAG_AP_STARTED, &wlvif->flags)) {
+		new_peer = kzalloc(sizeof(struct ap_peers), GFP_KERNEL);
+		memcpy(&new_peer->sta, sta, sizeof(struct ieee80211_sta));
+		new_peer->hw = hw;
+		new_peer->vif = vif;
+		list_add(&new_peer->list, &wl->peers_list);
+		wl1271_debug(DEBUG_AP, "add pending sta %pM to the list",
+			     new_peer->sta.addr);
+		goto out;
+	}
+
+	ret = wl1271_allocate_sta(wl, wlvif, sta);
+	if (ret < 0)
+		goto out;
+
+	wl_sta = (struct wl1271_station *)sta->drv_priv;
+	hlid = wl_sta->hlid;
+
+	ret = wl12xx_cmd_add_peer(wl, wlvif, sta, hlid);
+	if (ret < 0)
+		wl1271_free_sta(wl, wlvif, hlid);
+
+out:
+	return ret;
+}
+
+static int wl1271_op_sta_add(struct ieee80211_hw *hw,
+			     struct ieee80211_vif *vif,
+			     struct ieee80211_sta *sta)
+{
+	struct wl1271 *wl = hw->priv;
+	struct wl12xx_vif *wlvif = wl12xx_vif_to_data(vif);
+	int ret = 0;
 
 	mutex_lock(&wl->mutex);
 
@@ -4665,24 +4723,14 @@ static int wl1271_op_sta_add(struct ieee80211_hw *hw,
 
 	wl1271_debug(DEBUG_MAC80211, "mac80211 add sta %d", (int)sta->aid);
 
-	ret = wl1271_allocate_sta(wl, wlvif, sta);
+	ret = wl1271_ps_elp_wakeup(wl);
 	if (ret < 0)
 		goto out;
 
-	wl_sta = (struct wl1271_station *)sta->drv_priv;
-	hlid = wl_sta->hlid;
-
-	ret = wl1271_ps_elp_wakeup(wl);
-	if (ret < 0)
-		goto out_free_sta;
-
-	ret = wl12xx_cmd_add_peer(wl, wlvif, sta, hlid);
+	ret = wl1271_op_sta_add_locked(hw, vif, sta);
 
 	wl1271_ps_elp_sleep(wl);
 
-out_free_sta:
-	if (ret < 0)
-		wl1271_free_sta(wl, wlvif, hlid);
 out:
 	mutex_unlock(&wl->mutex);
 	return ret;
@@ -4698,6 +4746,21 @@ static int wl1271_op_sta_remove(struct ieee80211_hw *hw,
 	int ret = 0, id;
 
 	mutex_lock(&wl->mutex);
+
+	if (!list_empty(&wl->peers_list) &&
+	    !test_bit(WLVIF_FLAG_AP_STARTED, &wlvif->flags)) {
+		struct ap_peers *peer, *next;
+		list_for_each_entry_safe(peer, next, &wl->peers_list, list) {
+			if (compare_ether_addr(sta->addr, peer->sta.addr))
+				continue;
+
+			wl1271_debug(DEBUG_AP, "remove pending sta %pM from the"
+				     " list", peer->sta.addr);
+			list_del(&peer->list);
+			kfree(peer);
+		}
+		goto out;
+	}
 
 	if (unlikely(wl->state == WL1271_STATE_OFF))
 		goto out;
@@ -4730,14 +4793,17 @@ out:
 	return ret;
 }
 
-static void wl12xx_op_sta_state(struct ieee80211_hw *hw,
-				struct ieee80211_vif *vif,
-				struct ieee80211_sta *sta,
-				enum ieee80211_sta_state state)
+void wl12xx_op_sta_state(struct ieee80211_hw *hw,
+			 struct ieee80211_vif *vif,
+			 struct ieee80211_sta *sta,
+			 enum ieee80211_sta_state state)
 {
 	struct wl1271 *wl = hw->priv;
 	struct wl12xx_vif *wlvif = wl12xx_vif_to_data(vif);
 	int ret;
+
+	if (!test_bit(WLVIF_FLAG_AP_STARTED, &wlvif->flags))
+		return;
 
 	wl1271_debug(DEBUG_MAC80211, "mac80211 sta %d state=%d",
 		     sta->aid, state);
@@ -4847,7 +4913,8 @@ static int wl1271_op_ampdu_action(struct ieee80211_hw *hw,
 							 hlid);
 		if (!ret) {
 			*ba_bitmap &= ~BIT(tid);
-			wl->ba_rx_session_count--;
+			if (wl->ba_rx_session_count > 0)
+				wl->ba_rx_session_count--;
 		}
 		break;
 
@@ -5692,6 +5759,7 @@ static struct ieee80211_hw *wl1271_alloc_hw(void)
 
 	INIT_LIST_HEAD(&wl->list);
 	INIT_LIST_HEAD(&wl->wlvif_list);
+	INIT_LIST_HEAD(&wl->peers_list);
 
 	wl->hw = hw;
 

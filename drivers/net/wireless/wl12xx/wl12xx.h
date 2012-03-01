@@ -295,6 +295,13 @@ struct wl1271_link {
 	u8 ba_bitmap;
 };
 
+struct ap_peers {
+	struct list_head list;
+	struct ieee80211_sta sta;
+	struct ieee80211_vif *vif;
+	struct ieee80211_hw *hw;
+};
+
 #define WL1271_MAX_RX_FILTERS 5
 #define WL1271_RX_FILTER_MAX_FIELDS 8
 
@@ -543,6 +550,9 @@ struct wl1271 {
 
 	/* RX Data filter rule status - enabled/disabled */
 	bool rx_data_filters_status[WL1271_MAX_RX_FILTERS];
+
+	/* AP's peers */
+	struct list_head peers_list;
 };
 
 struct wl1271_station {
@@ -714,6 +724,12 @@ struct wl12xx_rx_data_filter *wl1271_rx_filter_alloc(void);
 int wl1271_rx_filter_get_fields_size(struct wl12xx_rx_data_filter *filter);
 void wl1271_rx_filter_flatten_fields(struct wl12xx_rx_data_filter *filter,
 				     u8 *buf);
+int wl1271_op_sta_add_locked(struct ieee80211_hw *hw,
+			     struct ieee80211_vif *vif,
+			     struct ieee80211_sta *sta);
+void wl12xx_update_sta_state(struct wl1271 *wl,
+			     struct ieee80211_sta *sta,
+			     enum ieee80211_sta_state state);
 
 #define JOIN_TIMEOUT 5000 /* 5000 milliseconds to join */
 
