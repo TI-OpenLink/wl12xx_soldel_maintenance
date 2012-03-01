@@ -337,6 +337,31 @@ static int cmp_ies(u8 num, u8 *ies1, size_t len1, u8 *ies2, size_t len2)
 	return memcmp(ie1 + 2, ie2 + 2, ie1[1]);
 }
 
+static int cmp_ies_p2p(u8 num, u8 *ies1, size_t len1, u8 *ies2, size_t len2)
+{
+	const u8 *ie1 = cfg80211_find_ie(num, ies1, len1);
+	const u8 *ie2 = cfg80211_find_ie(num, ies2, len2);
+
+	/* equal if both missing */
+	if (!ie1 && !ie2)
+		return 0;
+	/* sort missing IE before (left of) present IE */
+	if (!ie1)
+		return -1;
+	if (!ie2)
+		return 1;
+
+	/* sort by length first, then by contents */
+	if (len1 >= (7+2) && memcmp(ie1 + 2, "DIRECT-", 7) == 0 &&
+	    len2 >= (7+2) && memcmp(ie2 + 2, "DIRECT-", 7) == 0)
+		return 0;
+
+	/* sort by length first, then by contents */
+	if (ie1[1] != ie2[1])
+		return ie2[1] - ie1[1];
+	return memcmp(ie1 + 2, ie2 + 2, ie1[1]);
+}
+
 static bool is_bss(struct cfg80211_bss *a,
 		   const u8 *bssid,
 		   const u8 *ssid, size_t ssid_len)
@@ -452,7 +477,7 @@ static int cmp_bss(struct cfg80211_bss *a,
 	if (r)
 		return r;
 
-	return cmp_ies(WLAN_EID_SSID,
+	return cmp_ies_p2p(WLAN_EID_SSID,
 		       a->information_elements,
 		       a->len_information_elements,
 		       b->information_elements,
