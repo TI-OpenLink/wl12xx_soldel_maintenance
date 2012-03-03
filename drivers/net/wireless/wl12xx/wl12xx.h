@@ -555,6 +555,9 @@ struct wl1271 {
 	struct list_head peers_list;
 
 	bool watchdog_recovery;
+
+	/* work to fire when Tx is stuck */
+	struct delayed_work tx_watchdog_work;
 };
 
 struct wl1271_station {
