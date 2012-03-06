@@ -2601,13 +2601,15 @@ static void __wl1271_op_remove_interface(struct wl1271 *wl,
 	}
 
 	if (!test_bit(WL1271_FLAG_RECOVERY_IN_PROGRESS, &wl->flags)) {
-		/* disable active roles */
+		/* disable active roles and clear RX filters */
 		ret = wl1271_ps_elp_wakeup(wl);
 		if (ret < 0)
 			goto deinit;
 
 		if (wlvif->bss_type == BSS_TYPE_STA_BSS ||
 		    wlvif->bss_type == BSS_TYPE_IBSS) {
+			wl1271_configure_wowlan(wl, NULL);
+
 			if (wl12xx_dev_role_started(wlvif))
 				wl12xx_stop_dev(wl, wlvif);
 
@@ -2632,8 +2634,6 @@ deinit:
 		wl12xx_free_rate_policy(wl, &wlvif->sta.basic_rate_idx);
 		wl12xx_free_rate_policy(wl, &wlvif->sta.ap_rate_idx);
 		wl12xx_free_rate_policy(wl, &wlvif->sta.p2p_rate_idx);
-		wl1271_rx_data_filtering_enable(wl, 0, FILTER_SIGNAL);
-		wl1271_rx_data_filters_clear_all(wl);
 	} else {
 		wlvif->ap.bcast_hlid = WL12XX_INVALID_LINK_ID;
 		wlvif->ap.global_hlid = WL12XX_INVALID_LINK_ID;
@@ -2645,6 +2645,8 @@ deinit:
 		wl1271_free_ap_keys(wl, wlvif);
 	}
 
+	memset(wl->rx_data_filters_status, 0,
+	       sizeof(wl->rx_data_filters_status));
 	wl12xx_tx_reset_wlvif(wl, wlvif);
 	if (wl->last_wlvif == wlvif)
 		wl->last_wlvif = NULL;
