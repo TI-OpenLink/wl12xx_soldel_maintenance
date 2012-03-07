@@ -1877,14 +1877,15 @@ static int ieee80211_set_power_mgmt(struct wiphy *wiphy, struct net_device *dev,
 	return 0;
 }
 
-static int ieee80211_set_rx_filters(struct wiphy *wiphy,
-				    struct cfg80211_wowlan *wowlan)
+int ieee80211_set_rx_filters(struct wiphy *wiphy,
+			     struct cfg80211_wowlan *wowlan)
 {
 	struct ieee80211_local *local = wiphy_priv(wiphy);
 
 	if (!(local->hw.flags & IEEE80211_HW_SUPPORTS_RX_FILTERS))
 		return 0;
 
+	local->wowlan_patterns = wowlan;
 	return drv_set_rx_filters(local, wowlan);
 }
 
