@@ -2092,20 +2092,20 @@ void ieee80211_sta_rx_queued_mgmt(struct ieee80211_sub_if_data *sdata,
 	if (skb->len >= 24 + 2 /* mgmt + deauth reason */ &&
 	    (fc & IEEE80211_FCTL_STYPE) == IEEE80211_STYPE_DEAUTH) {
 		struct ieee80211_local *local = sdata->local;
-		struct ieee80211_work *wk;
+		struct ieee80211_work *tmp, *wk = NULL;
 
 		mutex_lock(&local->mtx);
-		list_for_each_entry(wk, &local->work_list, list) {
-			if (wk->sdata != sdata)
+		list_for_each_entry(tmp, &local->work_list, list) {
+			if (tmp->sdata != sdata)
 				continue;
 
-			if (wk->type != IEEE80211_WORK_ASSOC &&
-			    wk->type != IEEE80211_WORK_ASSOC_BEACON_WAIT)
+			if (tmp->type != IEEE80211_WORK_ASSOC &&
+			    tmp->type != IEEE80211_WORK_ASSOC_BEACON_WAIT)
 				continue;
 
-			if (memcmp(mgmt->bssid, wk->filter_ta, ETH_ALEN))
+			if (memcmp(mgmt->bssid, tmp->filter_ta, ETH_ALEN))
 				continue;
-			if (memcmp(mgmt->sa, wk->filter_ta, ETH_ALEN))
+			if (memcmp(mgmt->sa, tmp->filter_ta, ETH_ALEN))
 				continue;
 
 			/*
@@ -2122,11 +2122,18 @@ void ieee80211_sta_rx_queued_mgmt(struct ieee80211_sub_if_data *sdata,
 			       sdata->name, mgmt->bssid,
 			       le16_to_cpu(mgmt->u.deauth.reason_code));
 
-			list_del_rcu(&wk->list);
-			free_work(wk);
+			list_del_rcu(&tmp->list);
+			synchronize_rcu();
+			wk = tmp;
 			break;
 		}
 		mutex_unlock(&local->mtx);
+
+		if (wk && wk->type == IEEE80211_WORK_ASSOC) {
+			/* clean up dummy sta */
+			sta_info_destroy_addr(wk->sdata, wk->filter_ta);
+		}
+		kfree(wk);
 
 		cfg80211_send_deauth(sdata->dev, (u8 *)mgmt, skb->len);
 	}
