@@ -553,6 +553,8 @@ struct wl1271 {
 
 	/* AP's peers */
 	struct list_head peers_list;
+
+	bool watchdog_recovery;
 };
 
 struct wl1271_station {

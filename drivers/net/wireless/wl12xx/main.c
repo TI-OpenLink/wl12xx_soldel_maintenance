@@ -977,6 +977,7 @@ static irqreturn_t wl1271_irq(int irq, void *cookie)
 		if (unlikely(intr & WL1271_ACX_INTR_WATCHDOG)) {
 			wl1271_error("watchdog interrupt received! "
 				     "starting recovery.");
+			wl->watchdog_recovery = true;
 			wl12xx_queue_recovery_work(wl);
 
 			/* restarting the chip. ignore any other interrupt. */
@@ -1198,12 +1199,14 @@ static void wl12xx_read_fwlog_panic(struct wl1271 *wl)
 	if (!block)
 		return;
 
-	/*
-	 * Make sure the chip is awake and the logger isn't active.
-	 * This might fail if the firmware hanged.
-	 */
-	if (!wl1271_ps_elp_wakeup(wl))
-		wl12xx_cmd_stop_fwlog(wl);
+	/* Make sure the chip is awake and the logger isn't active. */
+	if (!wl1271_ps_elp_wakeup(wl)) {
+		/* Do not send a stop fwlog command if the fw is hanged */
+		if (!wl->watchdog_recovery)
+			wl12xx_cmd_stop_fwlog(wl);
+	}
+	else
+		goto out;
 
 	/* Read the first memory block address */
 	wl12xx_fw_status(wl, wl->fw_status);
@@ -1251,6 +1254,8 @@ static void wl1271_recovery_work(struct work_struct *work)
 	set_bit(WL1271_FLAG_RECOVERY_IN_PROGRESS, &wl->flags);
 
 	wl12xx_read_fwlog_panic(wl);
+
+	wl->watchdog_recovery = false;
 
 	wl1271_info("Hardware recovery in progress. FW ver: %s pc: 0x%x",
 		    wl->chip.fw_ver_str, wl1271_read32(wl, SCR_PAD4));
@@ -2404,6 +2409,7 @@ power_off:
 		     wl->enable_11a ? "" : "not ");
 
 	wl->state = WL1271_STATE_ON;
+	wl->watchdog_recovery = false;
 out:
 	return booted;
 }
