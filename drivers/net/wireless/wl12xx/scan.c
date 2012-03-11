@@ -180,7 +180,9 @@ static int wl1271_scan_send(struct wl1271 *wl, enum ieee80211_band band,
 
 	cmd->params.tx_rate = cpu_to_le32(basic_rate);
 	cmd->params.n_probe_reqs = wl->conf.scan.num_probe_reqs;
-	cmd->params.tid_trigger = 0;
+
+	cmd->params.tid_trigger = 255;
+
 	cmd->params.scan_tag = WL1271_SCAN_DEFAULT_TAG;
 
 	if (band == IEEE80211_BAND_2GHZ)
