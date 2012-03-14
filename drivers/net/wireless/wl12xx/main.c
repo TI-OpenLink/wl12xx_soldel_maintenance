@@ -2646,6 +2646,8 @@ deinit:
 		wl1271_free_ap_keys(wl, wlvif);
 	}
 
+	dev_kfree_skb(wlvif->probereq);
+	wlvif->probereq = NULL;
 	memset(wl->rx_data_filters_status, 0,
 	       sizeof(wl->rx_data_filters_status));
 	wl12xx_tx_reset_wlvif(wl, wlvif);
