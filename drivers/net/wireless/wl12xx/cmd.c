@@ -668,13 +668,13 @@ int wl1271_cmd_role_stop_sta(struct wl1271 *wl)
 		goto out_free;
 	}
 	wl1271_debug(DEBUG_CMD, "skipping disconnect_event");
-#if 0
+
 	ret = wl1271_cmd_wait_for_event(wl, DISCONNECT_EVENT_COMPLETE_ID);
 	if (ret < 0) {
 		wl1271_error("cmd role stop sta event completion error");
 		goto out_free;
 	}
-#endif
+
 	wl1271_free_link(wl, &wl->sta_hlid);
 
 out_free:

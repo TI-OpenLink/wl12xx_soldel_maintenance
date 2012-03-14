@@ -721,6 +721,8 @@ struct wl1271 {
 
 	/* RX Data filter rule status - enabled/disabled */
 	bool rx_data_filters_status[WL1271_MAX_RX_DATA_FILTERS];
+
+	bool watchdog_recovery;
 };
 
 struct wl1271_station {

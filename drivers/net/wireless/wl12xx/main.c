@@ -229,7 +229,7 @@ static struct conf_drv_settings default_conf = {
 				.rule        = CONF_BCN_RULE_PASS_ON_CHANGE,
 			},
 		},
-		.synch_fail_thold            = 10,
+		.synch_fail_thold            = 20,
 		.bss_lose_timeout            = 100,
 		.beacon_rx_timeout           = 10000,
 		.broadcast_timeout           = 20000,
@@ -401,6 +401,8 @@ static struct platform_device wl1271_device = {
 static DEFINE_MUTEX(wl_list_mutex);
 static LIST_HEAD(wl_list);
 static bool bug_on_recovery = false;
+
+bool join_while_associated = false;
 
 static int wl1271_check_operstate(struct wl1271 *wl, unsigned char operstate)
 {
@@ -1030,6 +1032,9 @@ irqreturn_t wl1271_irq(int irq, void *cookie)
 		if (unlikely(intr & WL1271_ACX_INTR_WATCHDOG)) {
 			wl1271_error("watchdog interrupt received! "
 				     "starting recovery.");
+
+			wl->watchdog_recovery = true;
+
 			wl1271_queue_recovery_work(wl);
 
 			/* restarting the chip. ignore any other interrupt. */
@@ -1244,12 +1249,14 @@ static void wl12xx_read_fwlog_panic(struct wl1271 *wl)
 	if (!block)
 		return;
 
-	/*
-	 * Make sure the chip is awake and the logger isn't active.
-	 * This might fail if the firmware hanged.
-	 */
-	if (!wl1271_ps_elp_wakeup(wl))
-		wl12xx_cmd_stop_fwlog(wl);
+	/* Make sure the chip is awake and the logger isn't active. */
+	if (!wl1271_ps_elp_wakeup(wl)) {
+		/* Do not send a stop fwlog command if the fw is hanged */
+		if (!wl->watchdog_recovery)
+			wl12xx_cmd_stop_fwlog(wl);
+	}
+	else
+		goto out;
 
 	/* Read the first memory block address */
 	wl1271_fw_status(wl, wl->fw_status);
@@ -1296,6 +1303,8 @@ static void wl1271_recovery_work(struct work_struct *work)
 	set_bit(WL1271_FLAG_RECOVERY_IN_PROGRESS, &wl->flags);
 
 	wl12xx_read_fwlog_panic(wl);
+
+	wl->watchdog_recovery = false;
 
 	wl1271_info("Hardware recovery in progress. FW ver: %s pc: 0x%x",
 		    wl->chip.fw_ver_str, wl1271_read32(wl, SCR_PAD4));
@@ -2229,6 +2238,9 @@ power_off:
 
 	wl->vif = vif;
 	wl->state = WL1271_STATE_ON;
+
+	wl->watchdog_recovery = false;
+
 	set_bit(WL1271_FLAG_IF_INITIALIZED, &wl->flags);
 	wl1271_info("firmware booted (%s)", wl->chip.fw_ver_str);
 
@@ -2480,6 +2492,9 @@ static int wl1271_join(struct wl1271 *wl, bool set_assoc)
 	 */
 	if (test_bit(WL1271_FLAG_STA_ASSOCIATED, &wl->flags))
 		wl1271_info("JOIN while associated.");
+
+	if(!set_assoc)
+		join_while_associated = true;
 
 	/* clear encryption type */
 	wl->encryption_type = KEY_NONE;
@@ -3206,6 +3221,19 @@ static int wl1271_op_hw_scan(struct ieee80211_hw *hw,
 	}
 
 	ret = wl1271_scan(hw->priv, ssid, len, req);
+
+	if(join_while_associated) 
+	{
+		join_while_associated = false;
+		wl1271_scan_stop(wl);
+		wl->scan.state = WL1271_SCAN_STATE_IDLE;
+		memset(wl->scan.scanned_ch, 0, sizeof(wl->scan.scanned_ch));
+		wl->scan.req = NULL;
+		ieee80211_scan_completed(wl->hw, true);
+
+		cancel_delayed_work_sync(&wl->scan_complete_work);
+	}
+
 out_sleep:
 	wl1271_ps_elp_sleep(wl);
 out:
