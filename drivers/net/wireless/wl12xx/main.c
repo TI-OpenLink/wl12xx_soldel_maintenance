@@ -221,8 +221,8 @@ static struct conf_drv_settings default_conf = {
 	.conn = {
 		.wake_up_event               = CONF_WAKE_UP_EVENT_DTIM,
 		.listen_interval             = 1,
-		.suspend_wake_up_event       = CONF_WAKE_UP_EVENT_N_DTIM,
-		.suspend_listen_interval     = 3,
+		.suspend_wake_up_event       = CONF_WAKE_UP_EVENT_DTIM,
+		.suspend_listen_interval     = 1,
 		.bcn_filt_mode               = CONF_BCN_FILT_MODE_ENABLED,
 		.bcn_filt_ie_count           = 3,
 		.bcn_filt_ie = {
@@ -240,7 +240,7 @@ static struct conf_drv_settings default_conf = {
 			},
 
 		},
-		.synch_fail_thold            = 10,
+		.synch_fail_thold            = 15,
 		.bss_lose_timeout            = 100,
 		.cons_bcn_loss_time          = 5000,
 		.max_bcn_loss_time           = 10000,
@@ -253,7 +253,7 @@ static struct conf_drv_settings default_conf = {
 		.psm_entry_retries           = 8,
 		.psm_exit_retries            = 16,
 		.psm_entry_nullfunc_retries  = 3,
-		.dynamic_ps_timeout          = 200,
+		.dynamic_ps_timeout          = 1500,
 		.forced_ps                   = false,
 		.keep_alive_interval         = 55000,
 		.max_listen_interval         = 20,
