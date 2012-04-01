@@ -707,9 +707,16 @@ int wl12xx_cmd_role_start_ap(struct wl1271 *wl, struct wl12xx_vif *wlvif)
 
 	wl1271_debug(DEBUG_CMD, "cmd role start ap %d", wlvif->role_id);
 
-	/* trying to use hidden SSID with an old hostapd version */
+	/* trying to use a non-hidden SSID without SSID IE */
 	if (wlvif->ssid_len == 0 && !bss_conf->hidden_ssid) {
 		wl1271_error("got a null SSID from beacon/bss");
+		ret = -EINVAL;
+		goto out;
+	}
+
+	/* trying to use hidden SSID without configured SSID */
+	if (bss_conf->ssid_len == 0 && bss_conf->hidden_ssid) {
+		wl1271_error("missing hidden SSID");
 		ret = -EINVAL;
 		goto out;
 	}
