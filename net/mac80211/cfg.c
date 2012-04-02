@@ -498,8 +498,7 @@ static void ieee80211_config_ap_ssid(struct ieee80211_sub_if_data *sdata,
 
 	bss_conf->ssid_len = params->ssid_len;
 
-	if (params->ssid_len)
-		memcpy(bss_conf->ssid, params->ssid, params->ssid_len);
+	memcpy(bss_conf->ssid, params->ssid, params->ssid_len);
 
 	bss_conf->hidden_ssid =
 		(params->hidden_ssid != NL80211_HIDDEN_SSID_NOT_IN_USE);
@@ -629,7 +628,9 @@ static int ieee80211_config_beacon(struct ieee80211_sub_if_data *sdata,
 	if (!err)
 		changed |= BSS_CHANGED_AP_PROBE_RESP;
 
-	ieee80211_config_ap_ssid(sdata, params);
+	if (params->ssid_len)
+		ieee80211_config_ap_ssid(sdata, params);
+
 	changed |= BSS_CHANGED_BEACON_ENABLED |
 		   BSS_CHANGED_BEACON |
 		   BSS_CHANGED_SSID;
