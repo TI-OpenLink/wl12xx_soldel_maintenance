@@ -2,6 +2,7 @@
  * This file is part of wl1271
  *
  * Copyright (C) 2009 Nokia Corporation
+ * Copyright (C) 2012 Sony Mobile Communications AB
  *
  * Contact: Luciano Coelho <luciano.coelho@nokia.com>
  *
@@ -920,6 +921,13 @@ struct conf_conn_settings {
 	 * Range 0 - 255
 	 */
 	u8 psm_entry_retries;
+
+	/*
+	 * Specifies the time in ms to wait before retrying PSM entry.
+	 *
+	 * Range 0 - 100
+	 */
+	u32 psm_entry_retry_delay;
 
 	/*
 	 * Specifies the maximum number of times to try PSM exit if it fails

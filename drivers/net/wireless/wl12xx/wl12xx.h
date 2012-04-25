@@ -619,6 +619,7 @@ struct wl1271 {
 	struct completion *ps_compl;
 	struct delayed_work elp_work;
 	struct delayed_work pspoll_work;
+	struct delayed_work ps_retry_work;
 
 	/* counter for ps-poll delivery failures */
 	int ps_poll_failures;

@@ -238,7 +238,8 @@ static struct conf_drv_settings default_conf = {
 		.ps_poll_recovery_period     = 700,
 		.bet_enable                  = CONF_BET_MODE_ENABLE,
 		.bet_max_consecutive         = 50,
-		.psm_entry_retries           = 8,
+		.psm_entry_retries           = 20,
+		.psm_entry_retry_delay       = 20,
 		.psm_exit_retries            = 16,
 		.psm_entry_nullfunc_retries  = 3,
 		.keep_alive_interval         = 55000,
@@ -2338,6 +2339,7 @@ static void __wl1271_op_remove_interface(struct wl1271 *wl,
 	del_timer_sync(&wl->rx_streaming_timer);
 	cancel_work_sync(&wl->rx_streaming_enable_work);
 	cancel_work_sync(&wl->rx_streaming_disable_work);
+	cancel_delayed_work_sync(&wl->ps_retry_work);
 	cancel_delayed_work_sync(&wl->pspoll_work);
 	cancel_work_sync(&wl->ap_start_work);
 	cancel_delayed_work_sync(&wl->elp_work);
@@ -5305,6 +5307,7 @@ struct ieee80211_hw *wl1271_alloc_hw(void)
 
 	INIT_DELAYED_WORK(&wl->elp_work, wl1271_elp_work);
 	INIT_DELAYED_WORK(&wl->pspoll_work, wl1271_pspoll_work);
+	INIT_DELAYED_WORK(&wl->ps_retry_work, wl1271_ps_retry_work);
 	INIT_WORK(&wl->netstack_work, wl1271_netstack_work);
 	INIT_WORK(&wl->tx_work, wl1271_tx_work);
 	INIT_WORK(&wl->recovery_work, wl1271_recovery_work);

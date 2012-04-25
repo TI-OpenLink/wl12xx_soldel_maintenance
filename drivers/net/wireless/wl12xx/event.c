@@ -2,6 +2,7 @@
  * This file is part of wl1271
  *
  * Copyright (C) 2008-2009 Nokia Corporation
+ * Copyright (C) 2012 Sony Mobile Communications AB
  *
  * Contact: Luciano Coelho <luciano.coelho@nokia.com>
  *
@@ -96,12 +97,44 @@ static void wl1271_event_pspoll_delivery_fail(struct wl1271 *wl)
 	 */
 }
 
+void wl1271_ps_retry_work(struct work_struct *work)
+{
+	struct delayed_work *dwork;
+	struct wl1271 *wl;
+	int ret;
+
+	dwork = container_of(work, struct delayed_work, work);
+	wl = container_of(dwork, struct wl1271, ps_retry_work);
+
+	wl1271_debug(DEBUG_PSM, "ps retry work");
+
+	if (!test_bit(WL1271_FLAG_PSM, &wl->flags))
+		return;
+
+	mutex_lock(&wl->mutex);
+
+	ret = wl1271_ps_elp_wakeup(wl);
+	if (ret < 0)
+		goto out_unlock;
+
+	wl->psm_entry_retry++;
+	wl1271_ps_set_mode(wl, STATION_POWER_SAVE_MODE,
+			   wl->basic_rate, true);
+
+	wl1271_ps_elp_sleep(wl);
+
+
+out_unlock:
+	mutex_unlock(&wl->mutex);
+}
+
 static int wl1271_event_ps_report(struct wl1271 *wl,
 				  struct event_mailbox *mbox,
 				  bool *beacon_loss)
 {
 	int ret = 0;
 	u32 total_retries = wl->conf.conn.psm_entry_retries;
+	u32 delay = wl->conf.conn.psm_entry_retry_delay;
 
 	wl1271_debug(DEBUG_EVENT, "ps_status: 0x%x", mbox->ps_status);
 
@@ -112,13 +145,15 @@ static int wl1271_event_ps_report(struct wl1271 *wl,
 		if (!test_bit(WL1271_FLAG_PSM, &wl->flags)) {
 			/* remain in active mode */
 			wl->psm_entry_retry = 0;
+			cancel_delayed_work(&wl->ps_retry_work);
 			break;
 		}
 
 		if (wl->psm_entry_retry < total_retries) {
-			wl->psm_entry_retry++;
-			ret = wl1271_ps_set_mode(wl, STATION_POWER_SAVE_MODE,
-						 wl->basic_rate, true);
+			ieee80211_queue_delayed_work(wl->hw,
+						     &wl->ps_retry_work,
+						     msecs_to_jiffies(delay));
+
 		} else {
 			wl1271_info("No ack to nullfunc from AP.");
 			wl->psm_entry_retry = 0;
@@ -127,6 +162,7 @@ static int wl1271_event_ps_report(struct wl1271 *wl,
 		break;
 	case EVENT_ENTER_POWER_SAVE_SUCCESS:
 		wl->psm_entry_retry = 0;
+		cancel_delayed_work(&wl->ps_retry_work);
 
 		/* enable beacon filtering */
 		ret = wl1271_acx_beacon_filter_opt(wl, true);

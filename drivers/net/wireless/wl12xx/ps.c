@@ -2,6 +2,7 @@
  * This file is part of wl1271
  *
  * Copyright (C) 2008-2009 Nokia Corporation
+ * Copyright (C) 2012 Sony Mobile Communications AB
  *
  * Contact: Luciano Coelho <luciano.coelho@nokia.com>
  *
@@ -170,6 +171,9 @@ int wl1271_ps_set_mode(struct wl1271 *wl, enum wl1271_cmd_ps_mode mode,
 	case STATION_ACTIVE_MODE:
 	default:
 		wl1271_debug(DEBUG_PSM, "leaving psm");
+
+		wl->psm_entry_retry = 0;
+		cancel_delayed_work(&wl->ps_retry_work);
 
 		/* disable beacon early termination */
 		if (wl->band == IEEE80211_BAND_2GHZ) {
