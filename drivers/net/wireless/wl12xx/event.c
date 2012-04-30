@@ -137,7 +137,7 @@ static int wl1271_event_ps_report(struct wl1271 *wl,
 		 * BET has only a minor effect in 5GHz and masks
 		 * channel switch IEs, so we only enable BET on 2.4GHz
 		*/
-		if (wl->band == IEEE80211_BAND_2GHZ)
+		if ((wl->band == IEEE80211_BAND_2GHZ) && (wl->basic_rate < CONF_HW_BIT_RATE_9MBPS))
 			/* enable beacon early termination */
 			ret = wl1271_acx_bet_enable(wl, true);
 
