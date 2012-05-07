@@ -3911,6 +3911,7 @@ sta_not_found:
 			u32 rates;
 			int ieoffset;
 			wl->aid = bss_conf->aid;
+			wl->beacon_int = bss_conf->beacon_int;
 			set_assoc = true;
 
 			wl->ps_poll_failures = 0;
