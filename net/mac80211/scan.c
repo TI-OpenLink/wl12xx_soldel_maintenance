@@ -28,7 +28,7 @@
 #define IEEE80211_CHANNEL_TIME (HZ / 33)
 #define IEEE80211_PASSIVE_CHANNEL_TIME (HZ / 8)
 
-#define SCAN_RESULT_RSSI_THRESHOLD -8800
+//#define SCAN_RESULT_RSSI_THRESHOLD -8800
 
 struct ieee80211_bss *
 ieee80211_rx_bss_get(struct ieee80211_local *local, u8 *bssid, int freq,
@@ -96,8 +96,8 @@ ieee80211_bss_info_update(struct ieee80211_local *local,
 	else if (local->hw.flags & IEEE80211_HW_SIGNAL_UNSPEC)
 		signal = (rx_status->signal * 100) / local->hw.max_signal;
 
-	if (signal < SCAN_RESULT_RSSI_THRESHOLD)
-		return NULL;
+//	if (signal < SCAN_RESULT_RSSI_THRESHOLD)
+//		return NULL;
 
 	cbss = cfg80211_inform_bss_frame(local->hw.wiphy, channel,
 					 mgmt, len, signal, GFP_ATOMIC);
