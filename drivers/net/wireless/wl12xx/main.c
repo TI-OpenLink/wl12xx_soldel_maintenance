@@ -2105,6 +2105,8 @@ static int wl1271_op_resume(struct ieee80211_hw *hw)
 
 static int wl1271_op_start(struct ieee80211_hw *hw)
 {
+	struct wl1271 *wl = hw->priv;
+
 	wl1271_debug(DEBUG_MAC80211, "mac80211 start");
 
 	/*
@@ -2118,6 +2120,14 @@ static int wl1271_op_start(struct ieee80211_hw *hw)
 	 * is added. That is where we will initialize the hardware.
 	 */
 
+
+	/*
+	 * store wl in the global wl_list, used to find wl
+	 * in the wl1271_dev_notify callback
+	 */
+	mutex_lock(&wl_list_mutex);
+	list_add(&wl->list, &wl_list);
+	mutex_unlock(&wl_list_mutex);
 	return 0;
 }
 
@@ -2565,11 +2575,6 @@ out:
 	wl1271_ps_elp_sleep(wl);
 out_unlock:
 	mutex_unlock(&wl->mutex);
-
-	mutex_lock(&wl_list_mutex);
-	if (!ret)
-		list_add(&wl->list, &wl_list);
-	mutex_unlock(&wl_list_mutex);
 
 	return ret;
 }
