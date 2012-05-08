@@ -1302,7 +1302,10 @@ static void wl1271_recovery_work(struct work_struct *work)
 	/* Avoid a recursive recovery */
 	set_bit(WL1271_FLAG_RECOVERY_IN_PROGRESS, &wl->flags);
 
-	wl12xx_read_fwlog_panic(wl);
+
+#ifdef CONFIG_HAS_WAKELOCK
+	wake_lock_timeout(&wl->recovery_wake, 100*HZ);
+#endif
 
 	wl->watchdog_recovery = false;
 
@@ -2242,6 +2245,11 @@ power_off:
 	wl->watchdog_recovery = false;
 
 	set_bit(WL1271_FLAG_IF_INITIALIZED, &wl->flags);
+
+#ifdef CONFIG_HAS_WAKELOCK
+	wake_unlock(&wl->recovery_wake);
+#endif
+
 	wl1271_info("firmware booted (%s)", wl->chip.fw_ver_str);
 
 	/* update hw/fw version info in wiphy struct */
@@ -5408,6 +5416,7 @@ struct ieee80211_hw *wl1271_alloc_hw(void)
 #ifdef CONFIG_HAS_WAKELOCK
 	wake_lock_init(&wl->wake_lock, WAKE_LOCK_SUSPEND, "wl1271_wake");
 	wake_lock_init(&wl->rx_wake, WAKE_LOCK_SUSPEND, "rx_wake");
+	wake_lock_init(&wl->recovery_wake, WAKE_LOCK_SUSPEND, "wl12xx_recovery_wake");
 #endif
 
 	wl->state = WL1271_STATE_OFF;
@@ -5520,6 +5529,7 @@ int wl1271_free_hw(struct wl1271 *wl)
 #ifdef CONFIG_HAS_WAKELOCK
 	wake_lock_destroy(&wl->wake_lock);
 	wake_lock_destroy(&wl->rx_wake);
+	wake_lock_destroy(&wl->recovery_wake);
 #endif
 	platform_device_unregister(wl->plat_dev);
 	free_page((unsigned long)wl->fwlog);

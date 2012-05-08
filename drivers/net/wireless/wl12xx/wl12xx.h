@@ -630,6 +630,7 @@ struct wl1271 {
 #ifdef CONFIG_HAS_WAKELOCK
 	struct wake_lock wake_lock;
 	struct wake_lock rx_wake;
+	struct wake_lock recovery_wake;
 #endif
 
 	/* in dBm */
