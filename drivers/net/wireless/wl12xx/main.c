@@ -1156,8 +1156,11 @@ out:
 
 void wl12xx_queue_recovery_work(struct wl1271 *wl)
 {
-	if (!test_bit(WL1271_FLAG_RECOVERY_IN_PROGRESS, &wl->flags))
+	/* Avoid a recursive recovery */
+	if (!test_and_set_bit(WL1271_FLAG_RECOVERY_IN_PROGRESS, &wl->flags)) {
+		wl1271_disable_interrupts_nosync(wl);
 		ieee80211_queue_work(wl->hw, &wl->recovery_work);
+	}
 }
 
 size_t wl12xx_copy_fwlog(struct wl1271 *wl, u8 *memblock, size_t maxlen)
@@ -1251,9 +1254,6 @@ static void wl1271_recovery_work(struct work_struct *work)
 	if (wl->state != WL1271_STATE_ON)
 		goto out_unlock;
 
-	/* Avoid a recursive recovery */
-	set_bit(WL1271_FLAG_RECOVERY_IN_PROGRESS, &wl->flags);
-
 	wl12xx_read_fwlog_panic(wl);
 
 	wl->watchdog_recovery = false;
@@ -1293,8 +1293,6 @@ static void wl1271_recovery_work(struct work_struct *work)
 	}
 	mutex_unlock(&wl->mutex);
 	wl1271_op_stop(wl->hw);
-
-	clear_bit(WL1271_FLAG_RECOVERY_IN_PROGRESS, &wl->flags);
 
 	ieee80211_restart_hw(wl->hw);
 
@@ -2146,6 +2144,10 @@ static void wl1271_op_stop(struct ieee80211_hw *hw)
 	wl1271_disable_interrupts(wl);
 	mutex_lock(&wl->mutex);
 	if (wl->state == WL1271_STATE_OFF) {
+		if (test_and_clear_bit(WL1271_FLAG_RECOVERY_IN_PROGRESS,
+				       &wl->flags))
+			wl1271_enable_interrupts(wl);
+
 		mutex_unlock(&wl->mutex);
 
 		/*
@@ -2179,6 +2181,14 @@ static void wl1271_op_stop(struct ieee80211_hw *hw)
 	mutex_lock(&wl->mutex);
 
 	wl1271_power_off(wl);
+	/*
+	 * In case a recovery was scheduled, interrupts were disabled to avoid
+	 * an interrupt storm. Now that the power is down, it is safe to
+	 * re-enable interrupts to balance the disable depth
+	 */
+	if (test_and_clear_bit(WL1271_FLAG_RECOVERY_IN_PROGRESS, &wl->flags))
+		wl1271_enable_interrupts(wl);
+
 	wl->fw_type = WL12XX_FW_TYPE_NONE;
 
 	wl->band = IEEE80211_BAND_2GHZ;

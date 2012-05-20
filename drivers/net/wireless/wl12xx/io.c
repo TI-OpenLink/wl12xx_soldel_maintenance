@@ -119,6 +119,11 @@ void wl1271_disable_interrupts(struct wl1271 *wl)
 	disable_irq(wl->irq);
 }
 
+void wl1271_disable_interrupts_nosync(struct wl1271 *wl)
+{
+	disable_irq_nosync(wl->irq);
+}
+
 void wl1271_enable_interrupts(struct wl1271 *wl)
 {
 	enable_irq(wl->irq);
