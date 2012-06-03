@@ -1187,22 +1187,21 @@ int ieee80211_reconfig(struct ieee80211_local *local)
 	/* add STAs back */
 	mutex_lock(&local->sta_mtx);
 	list_for_each_entry(sta, &local->sta_list, list) {
-		if (sta->uploaded) {
-			enum ieee80211_sta_state state = IEEE80211_STA_NONE;
+		enum ieee80211_sta_state state;
 
-			sdata = sta->sdata;
-			if (sdata->vif.type == NL80211_IFTYPE_AP_VLAN)
-				sdata = container_of(sdata->bss,
-					     struct ieee80211_sub_if_data,
-					     u.ap);
+		if (!sta->uploaded)
+			continue;
 
-			if (WARN_ON(drv_sta_add(local, sdata, &sta->sta)))
-				continue;
+		/* AP-mode stations will be added later */
+		if (sta->sdata->vif.type == NL80211_IFTYPE_AP)
+			continue;
 
-			while (state < sta->sta.state)
-				drv_sta_state(local, sdata, &sta->sta,
-					      ++state);
-		}
+		if (WARN_ON(drv_sta_add(local, sta->sdata, &sta->sta)))
+			continue;
+
+		for (state = IEEE80211_STA_NONE;
+		     state < sta->sta.state; state++)
+			drv_sta_state(local, sta->sdata, &sta->sta, state + 1);
 	}
 	mutex_unlock(&local->sta_mtx);
 
@@ -1295,6 +1294,26 @@ int ieee80211_reconfig(struct ieee80211_local *local)
 			ieee80211_send_nullfunc(local, sdata, 0);
 		}
 	}
+
+	/* APs are now beaconing, add back stations */
+	mutex_lock(&local->sta_mtx);
+	list_for_each_entry(sta, &local->sta_list, list) {
+		enum ieee80211_sta_state state;
+
+		if (!sta->uploaded)
+			continue;
+
+		if (sta->sdata->vif.type != NL80211_IFTYPE_AP)
+			continue;
+
+		if (WARN_ON(drv_sta_add(local, sta->sdata, &sta->sta)))
+			continue;
+
+		for (state = IEEE80211_STA_NONE;
+		     state < sta->sta.state; state++)
+			drv_sta_state(local, sta->sdata, &sta->sta, state + 1);
+	}
+	mutex_unlock(&local->sta_mtx);
 
 	/* add back keys */
 	list_for_each_entry(sdata, &local->interfaces, list)
