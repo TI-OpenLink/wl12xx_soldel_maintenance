@@ -573,7 +573,6 @@ int wl1271_init_vif_specific(struct wl1271 *wl, struct ieee80211_vif *vif)
 
 	/*
 	 * consider all existing roles before configuring psm.
-	 * TODO: reconfigure on interface removal.
 	 */
 	if (!wl->ap_count) {
 		if (is_ap) {

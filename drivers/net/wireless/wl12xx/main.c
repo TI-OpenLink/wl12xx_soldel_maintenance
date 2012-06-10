@@ -2777,6 +2777,13 @@ deinit:
 	else
 		wl->sta_count--;
 
+	/* Last AP, have more stations. Configure according to STA. */
+	if (wl->ap_count == 0 && wlvif->bss_type == BSS_TYPE_AP_BSS
+	    && wl->sta_count) {
+		/* Configure for ELP power saving */
+		wl1271_acx_sleep_auth(wl, WL1271_PSM_ELP);
+	}
+
 	mutex_unlock(&wl->mutex);
 
 	del_timer_sync(&wlvif->rx_streaming_timer);
