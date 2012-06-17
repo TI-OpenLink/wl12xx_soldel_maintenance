@@ -55,16 +55,16 @@ void wl1271_io_reset(struct wl1271 *wl);
 void wl1271_io_init(struct wl1271 *wl);
 
 /* Raw target IO, address is not translated */
-static inline void wl1271_raw_write(struct wl1271 *wl, int addr, void *buf,
-				    size_t len, bool fixed)
-{
-	wl->if_ops->write(wl->dev, addr, buf, len, fixed);
-}
-
-static inline void wl1271_raw_read(struct wl1271 *wl, int addr, void *buf,
+static inline int wl1271_raw_write(struct wl1271 *wl, int addr, void *buf,
 				   size_t len, bool fixed)
 {
-	wl->if_ops->read(wl->dev, addr, buf, len, fixed);
+	return wl->if_ops->write(wl->dev, addr, buf, len, fixed);
+}
+
+static inline int wl1271_raw_read(struct wl1271 *wl, int addr, void *buf,
+				  size_t len, bool fixed)
+{
+	return wl->if_ops->read(wl->dev, addr, buf, len, fixed);
 }
 
 static inline u32 wl1271_raw_read32(struct wl1271 *wl, int addr)
