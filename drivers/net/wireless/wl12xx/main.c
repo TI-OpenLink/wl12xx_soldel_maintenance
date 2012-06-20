@@ -833,16 +833,20 @@ static void wl12xx_irq_update_links_status(struct wl1271 *wl,
 	}
 }
 
-static void wl12xx_fw_status(struct wl1271 *wl,
-			     struct wl12xx_fw_status *status)
+static int wl12xx_fw_status(struct wl1271 *wl,
+			    struct wl12xx_fw_status *status)
 {
 	struct wl12xx_vif *wlvif;
 	struct timespec ts;
 	u32 old_tx_blk_count = wl->tx_blocks_available;
 	int avail, freed_blocks;
 	int i;
+	int ret;
 
-	wl1271_raw_read(wl, FW_STATUS_ADDR, status, sizeof(*status), false);
+	ret = wl1271_raw_read(wl, FW_STATUS_ADDR, status, sizeof(*status),
+			      false);
+	if (ret < 0)
+		return ret;
 
 	wl1271_debug(DEBUG_IRQ, "intr: 0x%x (fw_rx_counter = %d, "
 		     "drv_rx_counter = %d, tx_results_counter = %d)",
@@ -899,6 +903,8 @@ static void wl12xx_fw_status(struct wl1271 *wl,
 	getnstimeofday(&ts);
 	wl->time_offset = (timespec_to_ns(&ts) >> 10) -
 		(s64)le32_to_cpu(status->fw_localtime);
+
+	return 0;
 }
 
 static void wl1271_flush_deferred_work(struct wl1271 *wl)
@@ -967,7 +973,12 @@ static irqreturn_t wl1271_irq(int irq, void *cookie)
 		clear_bit(WL1271_FLAG_IRQ_RUNNING, &wl->flags);
 		smp_mb__after_clear_bit();
 
-		wl12xx_fw_status(wl, wl->fw_status);
+		ret = wl12xx_fw_status(wl, wl->fw_status);
+		if (ret < 0) {
+			wl12xx_queue_recovery_work(wl);
+			goto out;
+		}
+
 		intr = le32_to_cpu(wl->fw_status->intr);
 		intr &= WL1271_INTR_MASK;
 		if (!intr) {
@@ -1191,6 +1202,7 @@ static void wl12xx_read_fwlog_panic(struct wl1271 *wl)
 	u32 addr;
 	u32 first_addr;
 	u8 *block;
+	int ret;
 
 	if ((wl->quirks & WL12XX_QUIRK_FWLOG_NOT_IMPLEMENTED) ||
 	    (wl->conf.fwlog.mode != WL12XX_FWLOG_ON_DEMAND) ||
@@ -1213,7 +1225,10 @@ static void wl12xx_read_fwlog_panic(struct wl1271 *wl)
 		goto out;
 
 	/* Read the first memory block address */
-	wl12xx_fw_status(wl, wl->fw_status);
+	ret = wl12xx_fw_status(wl, wl->fw_status);
+	if (ret < 0)
+		goto out;
+
 	first_addr = le32_to_cpu(wl->fw_status->log_start_addr);
 	if (!first_addr)
 		goto out;
