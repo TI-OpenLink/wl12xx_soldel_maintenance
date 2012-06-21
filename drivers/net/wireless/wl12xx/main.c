@@ -1257,6 +1257,21 @@ out:
 	kfree(block);
 }
 
+static void wl12xx_print_recovery(struct wl1271 *wl)
+{
+	u32 pc = 0;
+	int ret;
+
+	wl1271_info("Hardware recovery in progress. FW ver: %s",
+		    wl->chip.fw_ver_str);
+
+	ret = wl1271_read32(wl, SCR_PAD4, &pc);
+	if (ret < 0)
+		return;
+
+	wl1271_info("pc: 0x%x", pc);
+}
+
 static void wl1271_recovery_work(struct work_struct *work)
 {
 	struct wl1271 *wl =
@@ -1273,8 +1288,7 @@ static void wl1271_recovery_work(struct work_struct *work)
 
 	wl->watchdog_recovery = false;
 
-	wl1271_info("Hardware recovery in progress. FW ver: %s pc: 0x%x",
-		    wl->chip.fw_ver_str, wl1271_read32(wl, SCR_PAD4));
+	wl12xx_print_recovery(wl);
 
 	BUG_ON(bug_on_recovery &&
 	       !test_bit(WL1271_FLAG_INTENDED_FW_RECOVERY, &wl->flags));
@@ -5554,14 +5568,20 @@ static void wl12xx_derive_mac_addresses(struct wl1271 *wl,
 	wl->hw->wiphy->addresses = wl->addresses;
 }
 
-static void wl12xx_get_fuse_mac(struct wl1271 *wl)
+static int wl12xx_get_fuse_mac(struct wl1271 *wl)
 {
 	u32 mac1, mac2;
+	int ret;
 
 	wl1271_set_partition(wl, &wl12xx_part_table[PART_DRPW]);
 
-	mac1 = wl1271_read32(wl, WL12XX_REG_FUSE_BD_ADDR_1);
-	mac2 = wl1271_read32(wl, WL12XX_REG_FUSE_BD_ADDR_2);
+	ret = wl1271_read32(wl, WL12XX_REG_FUSE_BD_ADDR_1, &mac1);
+	if (ret < 0)
+		goto out;
+
+	ret = wl1271_read32(wl, WL12XX_REG_FUSE_BD_ADDR_2, &mac2);
+	if (ret < 0)
+		goto out;
 
 	/* these are the two parts of the BD_ADDR */
 	wl->fuse_oui_addr = ((mac2 & 0xffff) << 8) +
@@ -5569,23 +5589,32 @@ static void wl12xx_get_fuse_mac(struct wl1271 *wl)
 	wl->fuse_nic_addr = mac1 & 0xffffff;
 
 	wl1271_set_partition(wl, &wl12xx_part_table[PART_DOWN]);
+
+out:
+	return ret;
 }
 
 static int wl12xx_get_hw_info(struct wl1271 *wl)
 {
 	int ret;
-	u32 die_info;
+	u16 die_info;
 
 	ret = wl12xx_set_power_on(wl);
 	if (ret < 0)
 		goto out;
 
-	wl->chip.id = wl1271_read32(wl, CHIP_ID_B);
+	ret = wl1271_read32(wl, CHIP_ID_B, &wl->chip.id);
+	if (ret < 0)
+		goto out;
 
 	if (wl->chip.id == CHIP_ID_1283_PG20)
-		die_info = wl1271_top_reg_read(wl, WL128X_REG_FUSE_DATA_2_1);
+		ret = wl1271_top_reg_read(wl, WL128X_REG_FUSE_DATA_2_1,
+					  &die_info);
 	else
-		die_info = wl1271_top_reg_read(wl, WL127X_REG_FUSE_DATA_2_1);
+		ret = wl1271_top_reg_read(wl, WL127X_REG_FUSE_DATA_2_1,
+					  &die_info);
+	if (ret < 0)
+		goto out;
 
 	wl->hw_pg_ver = (s8) (die_info & PG_VER_MASK) >> PG_VER_OFFSET;
 
@@ -5593,11 +5622,13 @@ static int wl12xx_get_hw_info(struct wl1271 *wl)
 		wl->fuse_oui_addr = 0;
 		wl->fuse_nic_addr = 0;
 	} else {
-		wl12xx_get_fuse_mac(wl);
+		ret = wl12xx_get_fuse_mac(wl);
+		if (ret < 0)
+			goto out;
 	}
 
-	wl1271_power_off(wl);
 out:
+	wl1271_power_off(wl);
 	return ret;
 }
 

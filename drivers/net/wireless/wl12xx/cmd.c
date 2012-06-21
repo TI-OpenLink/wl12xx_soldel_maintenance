@@ -71,7 +71,10 @@ int wl1271_cmd_send(struct wl1271 *wl, u16 id, void *buf, size_t len,
 
 	timeout = jiffies + msecs_to_jiffies(WL1271_COMMAND_TIMEOUT);
 
-	intr = wl1271_read32(wl, ACX_REG_INTERRUPT_NO_CLEAR);
+	ret = wl1271_read32(wl, ACX_REG_INTERRUPT_NO_CLEAR, &intr);
+	if (ret < 0)
+		goto fail;
+
 	while (!(intr & WL1271_ACX_INTR_CMD_COMPLETE)) {
 		if (time_after(jiffies, timeout)) {
 			wl1271_error("command complete timeout");
@@ -85,7 +88,9 @@ int wl1271_cmd_send(struct wl1271 *wl, u16 id, void *buf, size_t len,
 		else
 			msleep(1);
 
-		intr = wl1271_read32(wl, ACX_REG_INTERRUPT_NO_CLEAR);
+		ret = wl1271_read32(wl, ACX_REG_INTERRUPT_NO_CLEAR, &intr);
+		if (ret < 0)
+			goto fail;
 	}
 
 	/* read back the status code of the command */

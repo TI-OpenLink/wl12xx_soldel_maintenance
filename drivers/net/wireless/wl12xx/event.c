@@ -306,13 +306,20 @@ int wl1271_event_unmask(struct wl1271 *wl)
 	return 0;
 }
 
-void wl1271_event_mbox_config(struct wl1271 *wl)
+int wl1271_event_mbox_config(struct wl1271 *wl)
 {
-	wl->mbox_ptr[0] = wl1271_read32(wl, REG_EVENT_MAILBOX_PTR);
+	int ret;
+
+	ret = wl1271_read32(wl, REG_EVENT_MAILBOX_PTR, &wl->mbox_ptr[0]);
+	if (ret < 0)
+		return ret;
+
 	wl->mbox_ptr[1] = wl->mbox_ptr[0] + sizeof(struct event_mailbox);
 
 	wl1271_debug(DEBUG_EVENT, "MBOX ptrs: 0x%x 0x%x",
 		     wl->mbox_ptr[0], wl->mbox_ptr[1]);
+
+	return 0;
 }
 
 int wl1271_event_handle(struct wl1271 *wl, u8 mbox_num)

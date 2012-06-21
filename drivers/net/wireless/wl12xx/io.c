@@ -216,10 +216,11 @@ void wl1271_top_reg_write(struct wl1271 *wl, int addr, u16 val)
 	wl1271_write32(wl, OCP_CMD, OCP_CMD_WRITE);
 }
 
-u16 wl1271_top_reg_read(struct wl1271 *wl, int addr)
+int wl1271_top_reg_read(struct wl1271 *wl, int addr, u16 *out)
 {
 	u32 val;
 	int timeout = OCP_CMD_LOOP;
+	int ret;
 
 	/* write address >> 1 + 0x30000 to OCP_POR_CTR */
 	addr = (addr >> 1) + 0x30000;
@@ -230,20 +231,25 @@ u16 wl1271_top_reg_read(struct wl1271 *wl, int addr)
 
 	/* poll for data ready */
 	do {
-		val = wl1271_read32(wl, OCP_DATA_READ);
+		ret = wl1271_read32(wl, OCP_DATA_READ, &val);
+		if (ret < 0)
+			return ret;
 	} while (!(val & OCP_READY_MASK) && --timeout);
 
 	if (!timeout) {
 		wl1271_warning("Top register access timed out.");
-		return 0xffff;
+		return -ETIMEDOUT;
 	}
 
 	/* check data status and return if OK */
-	if ((val & OCP_STATUS_MASK) == OCP_STATUS_OK)
-		return val & 0xffff;
-	else {
+	if ((val & OCP_STATUS_MASK) != OCP_STATUS_OK) {
 		wl1271_warning("Top register access returned error.");
-		return 0xffff;
+		return -EIO;
 	}
+
+	if (out)
+		*out = val & 0xffff;
+
+	return 0;
 }
 

@@ -67,12 +67,20 @@ static inline int wl1271_raw_read(struct wl1271 *wl, int addr, void *buf,
 	return wl->if_ops->read(wl->dev, addr, buf, len, fixed);
 }
 
-static inline u32 wl1271_raw_read32(struct wl1271 *wl, int addr)
+static inline int wl1271_raw_read32(struct wl1271 *wl, int addr, u32 *val)
 {
-	wl1271_raw_read(wl, addr, &wl->buffer_32,
-			    sizeof(wl->buffer_32), false);
+	int ret;
 
-	return le32_to_cpu(wl->buffer_32);
+	ret = wl1271_raw_read(wl, addr, &wl->buffer_32, sizeof(wl->buffer_32),
+			      false);
+	if (ret < 0)
+		goto out;
+
+	if (val)
+		*val = le32_to_cpu(wl->buffer_32);
+
+out:
+	return ret;
 }
 
 static inline void wl1271_raw_write32(struct wl1271 *wl, int addr, u32 val)
@@ -140,9 +148,9 @@ static inline void wl1271_read_hwaddr(struct wl1271 *wl, int hwaddr,
 	wl1271_raw_read(wl, physical, buf, len, fixed);
 }
 
-static inline u32 wl1271_read32(struct wl1271 *wl, int addr)
+static inline int wl1271_read32(struct wl1271 *wl, int addr, u32 *val)
 {
-	return wl1271_raw_read32(wl, wl1271_translate_addr(wl, addr));
+	return wl1271_raw_read32(wl, wl1271_translate_addr(wl, addr), val);
 }
 
 static inline void wl1271_write32(struct wl1271 *wl, int addr, u32 val)
@@ -174,7 +182,7 @@ static inline int wl1271_power_on(struct wl1271 *wl)
 
 /* Top Register IO */
 void wl1271_top_reg_write(struct wl1271 *wl, int addr, u16 val);
-u16 wl1271_top_reg_read(struct wl1271 *wl, int addr);
+int wl1271_top_reg_read(struct wl1271 *wl, int addr, u16 *out);
 
 int wl1271_set_partition(struct wl1271 *wl,
 			 struct wl1271_partition_set *p);
