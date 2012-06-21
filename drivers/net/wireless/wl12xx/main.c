@@ -932,19 +932,14 @@ static void wl1271_netstack_work(struct work_struct *work)
 
 #define WL1271_IRQ_MAX_LOOPS 256
 
-static irqreturn_t wl1271_irq(int irq, void *cookie)
+static int wl12xx_irq_locked(struct wl1271 *wl)
 {
-	int ret;
+	int ret = 0;
 	u32 intr;
 	int loopcount = WL1271_IRQ_MAX_LOOPS;
-	struct wl1271 *wl = (struct wl1271 *)cookie;
 	bool done = false;
 	unsigned int defer_count;
 	unsigned long flags;
-
-	/* TX might be handled here, avoid redundant work */
-	set_bit(WL1271_FLAG_TX_PENDING, &wl->flags);
-	cancel_work_sync(&wl->tx_work);
 
 	/*
 	 * In case edge triggered interrupt must be used, we cannot iterate
@@ -952,8 +947,6 @@ static irqreturn_t wl1271_irq(int irq, void *cookie)
 	 */
 	if (wl->platform_quirks & WL12XX_PLATFORM_QUIRK_EDGE_IRQ)
 		loopcount = 1;
-
-	mutex_lock(&wl->mutex);
 
 	wl1271_debug(DEBUG_IRQ, "IRQ work");
 
@@ -974,10 +967,8 @@ static irqreturn_t wl1271_irq(int irq, void *cookie)
 		smp_mb__after_clear_bit();
 
 		ret = wl12xx_fw_status(wl, wl->fw_status);
-		if (ret < 0) {
-			wl12xx_queue_recovery_work(wl);
+		if (ret < 0)
 			goto out;
-		}
 
 		intr = le32_to_cpu(wl->fw_status->intr);
 		intr &= WL1271_INTR_MASK;
@@ -990,7 +981,6 @@ static irqreturn_t wl1271_irq(int irq, void *cookie)
 			wl1271_error("watchdog interrupt received! "
 				     "starting recovery.");
 			wl->watchdog_recovery = true;
-			wl12xx_queue_recovery_work(wl);
 
 			/* restarting the chip. ignore any other interrupt. */
 			goto out;
@@ -1000,10 +990,8 @@ static irqreturn_t wl1271_irq(int irq, void *cookie)
 			wl1271_debug(DEBUG_IRQ, "WL1271_ACX_INTR_DATA");
 
 			ret = wl12xx_rx(wl, wl->fw_status);
-			if (ret < 0) {
-				wl12xx_queue_recovery_work(wl);
+			if (ret < 0)
 				goto out;
-			}
 
 			/* Check if any tx blocks were freed */
 			spin_lock_irqsave(&wl->wl_lock, flags);
@@ -1015,10 +1003,8 @@ static irqreturn_t wl1271_irq(int irq, void *cookie)
 				 * call the work function directly.
 				 */
 				ret = wl1271_tx_work_locked(wl);
-				if (ret < 0) {
-					wl12xx_queue_recovery_work(wl);
+				if (ret < 0)
 					goto out;
-				}
 			} else {
 				spin_unlock_irqrestore(&wl->wl_lock, flags);
 			}
@@ -1027,10 +1013,8 @@ static irqreturn_t wl1271_irq(int irq, void *cookie)
 			if (wl->fw_status->tx_results_counter !=
 			    (wl->tx_results_count & 0xff)) {
 				ret = wl1271_tx_complete(wl);
-				if (ret < 0) {
-					wl12xx_queue_recovery_work(wl);
+				if (ret < 0)
 					goto out;
-				}
 			}
 
 			/* Make sure the deferred queues don't get too long */
@@ -1043,19 +1027,15 @@ static irqreturn_t wl1271_irq(int irq, void *cookie)
 		if (intr & WL1271_ACX_INTR_EVENT_A) {
 			wl1271_debug(DEBUG_IRQ, "WL1271_ACX_INTR_EVENT_A");
 			ret = wl1271_event_handle(wl, 0);
-			if (ret < 0) {
-				wl12xx_queue_recovery_work(wl);
+			if (ret < 0)
 				goto out;
-			}
 		}
 
 		if (intr & WL1271_ACX_INTR_EVENT_B) {
 			wl1271_debug(DEBUG_IRQ, "WL1271_ACX_INTR_EVENT_B");
 			ret = wl1271_event_handle(wl, 1);
-			if (ret < 0) {
-				wl12xx_queue_recovery_work(wl);
+			if (ret < 0)
 				goto out;
-			}
 		}
 
 		if (intr & WL1271_ACX_INTR_INIT_COMPLETE)
@@ -1069,6 +1049,25 @@ static irqreturn_t wl1271_irq(int irq, void *cookie)
 	wl1271_ps_elp_sleep(wl);
 
 out:
+	return ret;
+}
+
+static irqreturn_t wl12xx_irq(int irq, void *cookie)
+{
+	int ret;
+	unsigned long flags;
+	struct wl1271 *wl = cookie;
+
+	/* TX might be handled here, avoid redundant work */
+	set_bit(WL1271_FLAG_TX_PENDING, &wl->flags);
+	cancel_work_sync(&wl->tx_work);
+
+	mutex_lock(&wl->mutex);
+
+	ret = wl12xx_irq_locked(wl);
+	if (ret)
+		wl12xx_queue_recovery_work(wl);
+
 	spin_lock_irqsave(&wl->wl_lock, flags);
 	/* In case TX was not handled here, queue TX work */
 	clear_bit(WL1271_FLAG_TX_PENDING, &wl->flags);
@@ -2170,7 +2169,7 @@ static int wl1271_op_resume(struct ieee80211_hw *hw)
 
 		/* don't talk to the HW if recovery is pending */
 		if (!pending_recovery)
-			wl1271_irq(0, wl);
+			wl12xx_irq(0, wl);
 
 		wl1271_enable_interrupts(wl);
 	}
@@ -6101,7 +6100,7 @@ static int __devinit wl12xx_probe(struct platform_device *pdev)
 	else
 		irqflags = IRQF_TRIGGER_HIGH | IRQF_ONESHOT;
 
-	ret = request_threaded_irq(wl->irq, wl12xx_hardirq, wl1271_irq,
+	ret = request_threaded_irq(wl->irq, wl12xx_hardirq, wl12xx_irq,
 				   irqflags,
 				   pdev->name, wl);
 	if (ret < 0) {
