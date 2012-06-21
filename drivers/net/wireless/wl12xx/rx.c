@@ -350,13 +350,19 @@ int wl1271_rx_data_filter_enable(struct wl1271 *wl,
 }
 
 /* Unset any active filters */
-void wl1271_rx_data_filters_clear_all(struct wl1271 *wl)
+int wl1271_rx_data_filters_clear_all(struct wl1271 *wl)
 {
 	int i;
+	int ret = 0;
 
 	for (i = 0; i < WL1271_MAX_RX_FILTERS; i++) {
 		if (!wl->rx_data_filters_status[i])
 			continue;
-		wl1271_rx_data_filter_enable(wl, i, 0, NULL);
+		ret = wl1271_rx_data_filter_enable(wl, i, 0, NULL);
+		if (ret < 0)
+			goto out;
 	}
+
+out:
+	return ret;
 }

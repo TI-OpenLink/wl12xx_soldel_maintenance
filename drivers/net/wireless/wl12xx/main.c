@@ -1937,8 +1937,13 @@ static int wl1271_configure_wowlan(struct wl1271 *wl,
 	int i, ret;
 
 	if (!wow || wow->any || !wow->n_patterns) {
-		wl1271_rx_data_filtering_enable(wl, 0, FILTER_SIGNAL);
-		wl1271_rx_data_filters_clear_all(wl);
+		ret = wl1271_rx_data_filtering_enable(wl, 0, FILTER_SIGNAL);
+		if (ret < 0)
+			goto out;
+
+		ret = wl1271_rx_data_filters_clear_all(wl);
+		if (ret < 0)
+			goto out;
 		return 0;
 	}
 
@@ -1954,8 +1959,13 @@ static int wl1271_configure_wowlan(struct wl1271 *wl,
 		}
 	}
 
-	wl1271_rx_data_filtering_enable(wl, 0, FILTER_SIGNAL);
-	wl1271_rx_data_filters_clear_all(wl);
+	ret = wl1271_rx_data_filtering_enable(wl, 0, FILTER_SIGNAL);
+	if (ret < 0)
+		goto out;
+
+	ret = wl1271_rx_data_filters_clear_all(wl);
+	if (ret < 0)
+		goto out;
 
 	/* Translate WoWLAN patterns into filters */
 	for (i = 0; i < wow->n_patterns; i++) {
@@ -2708,7 +2718,9 @@ static void __wl1271_op_remove_interface(struct wl1271 *wl,
 
 		if (wlvif->bss_type == BSS_TYPE_STA_BSS ||
 		    wlvif->bss_type == BSS_TYPE_IBSS) {
-			wl1271_configure_wowlan(wl, NULL);
+			ret = wl1271_configure_wowlan(wl, NULL);
+			if (ret < 0)
+				goto deinit;
 
 			if (wl12xx_dev_role_started(wlvif))
 				wl12xx_stop_dev(wl, wlvif);
