@@ -223,7 +223,7 @@ void wl1271_io_init(struct wl1271 *wl)
 		wl->if_ops->init(wl->dev);
 }
 
-int wl1271_top_reg_write(struct wl1271 *wl, int addr, u16 val)
+int __must_check wl1271_top_reg_write(struct wl1271 *wl, int addr, u16 val)
 {
 	int ret;
 
@@ -245,7 +245,7 @@ out:
 	return ret;
 }
 
-int wl1271_top_reg_read(struct wl1271 *wl, int addr, u16 *out)
+int __must_check wl1271_top_reg_read(struct wl1271 *wl, int addr, u16 *out)
 {
 	u32 val;
 	int timeout = OCP_CMD_LOOP;

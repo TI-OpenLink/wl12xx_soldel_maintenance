@@ -67,8 +67,8 @@ static void wl1271_sdio_set_block_size(struct device *child,
 	sdio_release_host(func);
 }
 
-static int wl12xx_sdio_raw_read(struct device *child, int addr, void *buf,
-				size_t len, bool fixed)
+static int __must_check wl12xx_sdio_raw_read(struct device *child, int addr,
+					     void *buf, size_t len, bool fixed)
 {
 	int ret;
 	struct wl12xx_sdio_glue *glue = dev_get_drvdata(child->parent);
@@ -98,8 +98,8 @@ static int wl12xx_sdio_raw_read(struct device *child, int addr, void *buf,
 	return ret;
 }
 
-static int wl12xx_sdio_raw_write(struct device *child, int addr, void *buf,
-				 size_t len, bool fixed)
+static int __must_check wl12xx_sdio_raw_write(struct device *child, int addr,
+					      void *buf, size_t len, bool fixed)
 {
 	int ret;
 	struct wl12xx_sdio_glue *glue = dev_get_drvdata(child->parent);
