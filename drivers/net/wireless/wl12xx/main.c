@@ -1258,8 +1258,10 @@ static void wl12xx_read_fwlog_panic(struct wl1271 *wl)
 	addr = first_addr;
 	do {
 		memset(block, 0, WL12XX_HW_BLOCK_SIZE);
-		wl1271_read_hwaddr(wl, addr, block, WL12XX_HW_BLOCK_SIZE,
-				   false);
+		ret = wl1271_read_hwaddr(wl, addr, block, WL12XX_HW_BLOCK_SIZE,
+					 false);
+		if (ret < 0)
+			goto out;
 
 		/*
 		 * Memory blocks are linked to one another. The first 4 bytes
