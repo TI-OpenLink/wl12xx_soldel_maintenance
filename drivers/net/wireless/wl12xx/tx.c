@@ -717,8 +717,11 @@ int wl1271_tx_work_locked(struct wl1271 *wl)
 			 * Flush buffer and try again.
 			 */
 			wl1271_skb_queue_head(wl, wlvif, skb);
-			wl1271_write(wl, WL1271_SLV_MEM_DATA, wl->aggr_buf,
-				     buf_offset, true);
+			ret = wl1271_write(wl, WL1271_SLV_MEM_DATA,
+					   wl->aggr_buf, buf_offset, true);
+			if (ret < 0)
+				goto out;
+
 			sent_packets = true;
 			buf_offset = 0;
 			continue;
@@ -752,8 +755,11 @@ int wl1271_tx_work_locked(struct wl1271 *wl)
 
 out_ack:
 	if (buf_offset) {
-		wl1271_write(wl, WL1271_SLV_MEM_DATA, wl->aggr_buf,
-				buf_offset, true);
+		ret = wl1271_write(wl, WL1271_SLV_MEM_DATA, wl->aggr_buf,
+				   buf_offset, true);
+		if (ret < 0)
+			goto out;
+
 		sent_packets = true;
 	}
 	if (sent_packets) {

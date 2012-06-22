@@ -237,9 +237,11 @@ int wl12xx_rx(struct wl1271 *wl, struct wl12xx_fw_status *status)
 			wl->rx_mem_pool_addr.addr_extra =
 				wl->rx_mem_pool_addr.addr + 4;
 
-			wl1271_write(wl, WL1271_SLV_REG_DATA,
-				     &wl->rx_mem_pool_addr,
-				     sizeof(wl->rx_mem_pool_addr), false);
+			ret = wl1271_write(wl, WL1271_SLV_REG_DATA,
+					   &wl->rx_mem_pool_addr,
+					   sizeof(wl->rx_mem_pool_addr), false);
+			if (ret < 0)
+				goto out;
 		}
 
 		/* Read all available packets at once */

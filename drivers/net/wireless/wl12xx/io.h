@@ -124,14 +124,14 @@ static inline int wl1271_read(struct wl1271 *wl, int addr, void *buf,
 	return wl1271_raw_read(wl, physical, buf, len, fixed);
 }
 
-static inline void wl1271_write(struct wl1271 *wl, int addr, void *buf,
-				size_t len, bool fixed)
+static inline int wl1271_write(struct wl1271 *wl, int addr, void *buf,
+			       size_t len, bool fixed)
 {
 	int physical;
 
 	physical = wl1271_translate_addr(wl, addr);
 
-	wl1271_raw_write(wl, physical, buf, len, fixed);
+	return wl1271_raw_write(wl, physical, buf, len, fixed);
 }
 
 static inline void wl1271_read_hwaddr(struct wl1271 *wl, int hwaddr,

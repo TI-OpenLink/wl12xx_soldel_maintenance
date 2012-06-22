@@ -163,7 +163,9 @@ static int wl1271_boot_upload_firmware_chunk(struct wl1271 *wl, void *buf,
 		memcpy(chunk, p, CHUNK_SIZE);
 		wl1271_debug(DEBUG_BOOT, "uploading fw chunk 0x%p to 0x%x",
 			     p, addr);
-		wl1271_write(wl, addr, chunk, CHUNK_SIZE, false);
+		ret = wl1271_write(wl, addr, chunk, CHUNK_SIZE, false);
+		if (ret < 0)
+			goto out;
 
 		chunk_num++;
 	}
@@ -174,7 +176,7 @@ static int wl1271_boot_upload_firmware_chunk(struct wl1271 *wl, void *buf,
 	memcpy(chunk, p, fw_data_len % CHUNK_SIZE);
 	wl1271_debug(DEBUG_BOOT, "uploading fw last chunk (%zd B) 0x%p to 0x%x",
 		     fw_data_len % CHUNK_SIZE, p, addr);
-	wl1271_write(wl, addr, chunk, fw_data_len % CHUNK_SIZE, false);
+	ret = wl1271_write(wl, addr, chunk, fw_data_len % CHUNK_SIZE, false);
 
 out:
 	kfree(chunk);
@@ -354,7 +356,9 @@ static int wl1271_boot_upload_nvs(struct wl1271 *wl)
 		return -ENOMEM;
 
 	/* And finally we upload the NVS tables */
-	wl1271_write(wl, CMD_MBOX_ADDRESS, nvs_aligned, nvs_len, false);
+	ret = wl1271_write(wl, CMD_MBOX_ADDRESS, nvs_aligned, nvs_len, false);
+	if (ret < 0)
+		return ret;
 
 	kfree(nvs_aligned);
 	return 0;
