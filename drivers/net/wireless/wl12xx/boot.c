@@ -87,12 +87,15 @@ static void wl1271_parse_fw_ver(struct wl1271 *wl)
 	wl->quirks |= wl12xx_get_fw_ver_quirks(wl);
 }
 
-static void wl1271_boot_fw_version(struct wl1271 *wl)
+static int wl1271_boot_fw_version(struct wl1271 *wl)
 {
 	struct wl1271_static_data static_data;
+	int ret;
 
-	wl1271_read(wl, wl->cmd_box_addr, &static_data, sizeof(static_data),
-		    false);
+	ret = wl1271_read(wl, wl->cmd_box_addr, &static_data,
+			  sizeof(static_data), false);
+	if (ret < 0)
+		return ret;
 
 	strncpy(wl->chip.fw_ver_str, static_data.fw_version,
 		sizeof(wl->chip.fw_ver_str));
@@ -101,6 +104,8 @@ static void wl1271_boot_fw_version(struct wl1271 *wl)
 	wl->chip.fw_ver_str[sizeof(wl->chip.fw_ver_str) - 1] = '\0';
 
 	wl1271_parse_fw_ver(wl);
+
+	return 0;
 }
 
 static int wl1271_boot_upload_firmware_chunk(struct wl1271 *wl, void *buf,
@@ -491,7 +496,9 @@ static int wl1271_boot_run_firmware(struct wl1271 *wl)
 	wl1271_debug(DEBUG_MAILBOX, "cmd_box_addr 0x%x event_box_addr 0x%x",
 		     wl->cmd_box_addr, wl->event_box_addr);
 
-	wl1271_boot_fw_version(wl);
+	ret = wl1271_boot_fw_version(wl);
+	if (ret < 0)
+		goto out;
 
 	/*
 	 * in case of full asynchronous mode the firmware event must be

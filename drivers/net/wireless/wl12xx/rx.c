@@ -243,8 +243,10 @@ int wl12xx_rx(struct wl1271 *wl, struct wl12xx_fw_status *status)
 		}
 
 		/* Read all available packets at once */
-		wl1271_read(wl, WL1271_SLV_MEM_DATA, wl->aggr_buf,
-				buf_size, true);
+		ret = wl1271_read(wl, WL1271_SLV_MEM_DATA, wl->aggr_buf,
+				  buf_size, true);
+		if (ret < 0)
+			goto out;
 
 		/* Split data into separate packets */
 		pkt_offset = 0;

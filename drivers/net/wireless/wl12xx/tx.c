@@ -911,8 +911,11 @@ int wl1271_tx_complete(struct wl1271 *wl)
 	int ret;
 
 	/* read the tx results from the chipset */
-	wl1271_read(wl, le32_to_cpu(memmap->tx_result),
-		    wl->tx_res_if, sizeof(*wl->tx_res_if), false);
+	ret = wl1271_read(wl, le32_to_cpu(memmap->tx_result),
+			  wl->tx_res_if, sizeof(*wl->tx_res_if), false);
+	if (ret < 0)
+		goto out;
+
 	fw_counter = le32_to_cpu(wl->tx_res_if->tx_result_fw_counter);
 
 	/* write host counter to chipset (to ack) */
