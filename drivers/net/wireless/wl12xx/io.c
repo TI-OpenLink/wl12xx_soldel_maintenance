@@ -166,6 +166,8 @@ void wl1271_enable_interrupts(struct wl1271 *wl)
 int wl1271_set_partition(struct wl1271 *wl,
 			 struct wl1271_partition_set *p)
 {
+	int ret;
+
 	/* copy partition info */
 	memcpy(&wl->part, p, sizeof(*p));
 
@@ -179,15 +181,33 @@ int wl1271_set_partition(struct wl1271 *wl,
 		     p->mem3.start, p->mem3.size);
 
 	/* write partition info to the chipset */
-	wl1271_raw_write32(wl, HW_PART0_START_ADDR, p->mem.start);
-	wl1271_raw_write32(wl, HW_PART0_SIZE_ADDR, p->mem.size);
-	wl1271_raw_write32(wl, HW_PART1_START_ADDR, p->reg.start);
-	wl1271_raw_write32(wl, HW_PART1_SIZE_ADDR, p->reg.size);
-	wl1271_raw_write32(wl, HW_PART2_START_ADDR, p->mem2.start);
-	wl1271_raw_write32(wl, HW_PART2_SIZE_ADDR, p->mem2.size);
-	wl1271_raw_write32(wl, HW_PART3_START_ADDR, p->mem3.start);
+	ret = wl1271_raw_write32(wl, HW_PART0_START_ADDR, p->mem.start);
+	if (ret < 0)
+		return ret;
 
-	return 0;
+	ret = wl1271_raw_write32(wl, HW_PART0_SIZE_ADDR, p->mem.size);
+	if (ret < 0)
+		return ret;
+
+	ret = wl1271_raw_write32(wl, HW_PART1_START_ADDR, p->reg.start);
+	if (ret < 0)
+		return ret;
+
+	ret = wl1271_raw_write32(wl, HW_PART1_SIZE_ADDR, p->reg.size);
+	if (ret < 0)
+		return ret;
+
+	ret = wl1271_raw_write32(wl, HW_PART2_START_ADDR, p->mem2.start);
+	if (ret < 0)
+		return ret;
+
+	ret = wl1271_raw_write32(wl, HW_PART2_SIZE_ADDR, p->mem2.size);
+	if (ret < 0)
+		return ret;
+
+	ret = wl1271_raw_write32(wl, HW_PART3_START_ADDR, p->mem3.start);
+
+	return ret;
 }
 EXPORT_SYMBOL_GPL(wl1271_set_partition);
 
@@ -203,17 +223,26 @@ void wl1271_io_init(struct wl1271 *wl)
 		wl->if_ops->init(wl->dev);
 }
 
-void wl1271_top_reg_write(struct wl1271 *wl, int addr, u16 val)
+int wl1271_top_reg_write(struct wl1271 *wl, int addr, u16 val)
 {
+	int ret;
+
 	/* write address >> 1 + 0x30000 to OCP_POR_CTR */
 	addr = (addr >> 1) + 0x30000;
-	wl1271_write32(wl, OCP_POR_CTR, addr);
+	ret = wl1271_write32(wl, OCP_POR_CTR, addr);
+	if (ret < 0)
+		goto out;
 
 	/* write value to OCP_POR_WDATA */
-	wl1271_write32(wl, OCP_DATA_WRITE, val);
+	ret = wl1271_write32(wl, OCP_DATA_WRITE, val);
+	if (ret < 0)
+		goto out;
 
 	/* write 1 to OCP_CMD */
-	wl1271_write32(wl, OCP_CMD, OCP_CMD_WRITE);
+	ret = wl1271_write32(wl, OCP_CMD, OCP_CMD_WRITE);
+
+out:
+	return ret;
 }
 
 int wl1271_top_reg_read(struct wl1271 *wl, int addr, u16 *out)
@@ -224,10 +253,14 @@ int wl1271_top_reg_read(struct wl1271 *wl, int addr, u16 *out)
 
 	/* write address >> 1 + 0x30000 to OCP_POR_CTR */
 	addr = (addr >> 1) + 0x30000;
-	wl1271_write32(wl, OCP_POR_CTR, addr);
+	ret = wl1271_write32(wl, OCP_POR_CTR, addr);
+	if (ret < 0)
+		return ret;
 
 	/* write 2 to OCP_CMD */
-	wl1271_write32(wl, OCP_CMD, OCP_CMD_READ);
+	ret = wl1271_write32(wl, OCP_CMD, OCP_CMD_READ);
+	if (ret < 0)
+		return ret;
 
 	/* poll for data ready */
 	do {

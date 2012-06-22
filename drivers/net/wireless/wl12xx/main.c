@@ -999,7 +999,11 @@ static irqreturn_t wl1271_irq(int irq, void *cookie)
 		if (likely(intr & WL1271_ACX_INTR_DATA)) {
 			wl1271_debug(DEBUG_IRQ, "WL1271_ACX_INTR_DATA");
 
-			wl12xx_rx(wl, wl->fw_status);
+			ret = wl12xx_rx(wl, wl->fw_status);
+			if (ret < 0) {
+				wl12xx_queue_recovery_work(wl);
+				goto out;
+			}
 
 			/* Check if any tx blocks were freed */
 			spin_lock_irqsave(&wl->wl_lock, flags);
@@ -1010,15 +1014,24 @@ static irqreturn_t wl1271_irq(int irq, void *cookie)
 				 * In order to avoid starvation of the TX path,
 				 * call the work function directly.
 				 */
-				wl1271_tx_work_locked(wl);
+				ret = wl1271_tx_work_locked(wl);
+				if (ret < 0) {
+					wl12xx_queue_recovery_work(wl);
+					goto out;
+				}
 			} else {
 				spin_unlock_irqrestore(&wl->wl_lock, flags);
 			}
 
 			/* check for tx results */
 			if (wl->fw_status->tx_results_counter !=
-			    (wl->tx_results_count & 0xff))
-				wl1271_tx_complete(wl);
+			    (wl->tx_results_count & 0xff)) {
+				ret = wl1271_tx_complete(wl);
+				if (ret < 0) {
+					wl12xx_queue_recovery_work(wl);
+					goto out;
+				}
+			}
 
 			/* Make sure the deferred queues don't get too long */
 			defer_count = skb_queue_len(&wl->deferred_tx_queue) +
@@ -1029,12 +1042,20 @@ static irqreturn_t wl1271_irq(int irq, void *cookie)
 
 		if (intr & WL1271_ACX_INTR_EVENT_A) {
 			wl1271_debug(DEBUG_IRQ, "WL1271_ACX_INTR_EVENT_A");
-			wl1271_event_handle(wl, 0);
+			ret = wl1271_event_handle(wl, 0);
+			if (ret < 0) {
+				wl12xx_queue_recovery_work(wl);
+				goto out;
+			}
 		}
 
 		if (intr & WL1271_ACX_INTR_EVENT_B) {
 			wl1271_debug(DEBUG_IRQ, "WL1271_ACX_INTR_EVENT_B");
-			wl1271_event_handle(wl, 1);
+			ret = wl1271_event_handle(wl, 1);
+			if (ret < 0) {
+				wl12xx_queue_recovery_work(wl);
+				goto out;
+			}
 		}
 
 		if (intr & WL1271_ACX_INTR_INIT_COMPLETE)
@@ -1335,12 +1356,12 @@ out_unlock:
 	mutex_unlock(&wl->mutex);
 }
 
-static void wl1271_fw_wakeup(struct wl1271 *wl)
+static int wl1271_fw_wakeup(struct wl1271 *wl)
 {
 	u32 elp_reg;
 
 	elp_reg = ELPCTRL_WAKE_UP;
-	wl1271_raw_write32(wl, HW_ACCESS_ELP_CTRL_REG_ADDR, elp_reg);
+	return wl1271_raw_write32(wl, HW_ACCESS_ELP_CTRL_REG_ADDR, elp_reg);
 }
 
 static int wl1271_setup(struct wl1271 *wl)
@@ -1370,12 +1391,20 @@ static int wl12xx_set_power_on(struct wl1271 *wl)
 	wl1271_io_reset(wl);
 	wl1271_io_init(wl);
 
-	wl1271_set_partition(wl, &wl12xx_part_table[PART_DOWN]);
+	ret = wl1271_set_partition(wl, &wl12xx_part_table[PART_DOWN]);
+	if (ret < 0)
+		goto fail;
 
 	/* ELP module wake up */
-	wl1271_fw_wakeup(wl);
+	ret = wl1271_fw_wakeup(wl);
+	if (ret < 0)
+		goto fail;
 
 out:
+	return ret;
+
+fail:
+	wl1271_power_off(wl);
 	return ret;
 }
 
@@ -1623,6 +1652,7 @@ int wl1271_tx_dummy_packet(struct wl1271 *wl)
 {
 	unsigned long flags;
 	int q;
+	int ret = 0;
 
 	/* no need to queue a new dummy packet if one is already pending */
 	if (test_bit(WL1271_FLAG_DUMMY_PACKET_PENDING, &wl->flags))
@@ -1637,13 +1667,13 @@ int wl1271_tx_dummy_packet(struct wl1271 *wl)
 
 	/* The FW is low on RX memory blocks, so send the dummy packet asap */
 	if (!test_bit(WL1271_FLAG_FW_TX_BUSY, &wl->flags))
-		wl1271_tx_work_locked(wl);
+		ret = wl1271_tx_work_locked(wl);
 
 	/*
 	 * If the FW TX is busy, TX work will be scheduled by the threaded
 	 * interrupt handler function
 	 */
-	return 0;
+	return ret;
 }
 
 /*
@@ -2921,7 +2951,10 @@ static int wl12xx_config_vif(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 	    ((wlvif->band != conf->channel->band) ||
 	     (wlvif->channel != channel))) {
 		/* send all pending packets */
-		wl1271_tx_work_locked(wl);
+		ret = wl1271_tx_work_locked(wl);
+		if (ret < 0)
+			return ret;
+
 		wlvif->band = conf->channel->band;
 		wlvif->channel = channel;
 
@@ -5573,7 +5606,9 @@ static int wl12xx_get_fuse_mac(struct wl1271 *wl)
 	u32 mac1, mac2;
 	int ret;
 
-	wl1271_set_partition(wl, &wl12xx_part_table[PART_DRPW]);
+	ret = wl1271_set_partition(wl, &wl12xx_part_table[PART_DRPW]);
+	if (ret < 0)
+		goto out;
 
 	ret = wl1271_read32(wl, WL12XX_REG_FUSE_BD_ADDR_1, &mac1);
 	if (ret < 0)
@@ -5588,7 +5623,7 @@ static int wl12xx_get_fuse_mac(struct wl1271 *wl)
 		((mac1 & 0xff000000) >> 24);
 	wl->fuse_nic_addr = mac1 & 0xffffff;
 
-	wl1271_set_partition(wl, &wl12xx_part_table[PART_DOWN]);
+	ret = wl1271_set_partition(wl, &wl12xx_part_table[PART_DOWN]);
 
 out:
 	return ret;

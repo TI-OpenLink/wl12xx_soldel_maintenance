@@ -67,7 +67,9 @@ int wl1271_cmd_send(struct wl1271 *wl, u16 id, void *buf, size_t len,
 
 	wl1271_write(wl, wl->cmd_box_addr, buf, len, false);
 
-	wl1271_write32(wl, ACX_REG_INTERRUPT_TRIG, INTR_TRIG_CMD);
+	ret = wl1271_write32(wl, ACX_REG_INTERRUPT_TRIG, INTR_TRIG_CMD);
+	if (ret < 0)
+		goto fail;
 
 	timeout = jiffies + msecs_to_jiffies(WL1271_COMMAND_TIMEOUT);
 
@@ -105,9 +107,9 @@ int wl1271_cmd_send(struct wl1271 *wl, u16 id, void *buf, size_t len,
 		goto fail;
 	}
 
-	wl1271_write32(wl, ACX_REG_INTERRUPT_ACK,
-		       WL1271_ACX_INTR_CMD_COMPLETE);
-	return 0;
+	ret = wl1271_write32(wl, ACX_REG_INTERRUPT_ACK,
+			     WL1271_ACX_INTR_CMD_COMPLETE);
+	return ret;
 
 fail:
 	WARN_ON(1);
@@ -1945,7 +1947,9 @@ int wl12xx_stop_dev(struct wl1271 *wl, struct wl12xx_vif *wlvif)
 		return -EINVAL;
 
 	/* flush all pending packets */
-	wl1271_tx_work_locked(wl);
+	ret = wl1271_tx_work_locked(wl);
+	if (ret < 0)
+		goto out;
 
 	if (test_bit(wlvif->dev_role_id, wl->roc_map)) {
 		ret = wl12xx_croc(wl, wlvif->dev_role_id);
