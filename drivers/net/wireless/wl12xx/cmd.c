@@ -351,19 +351,23 @@ int wl1271_cmd_ext_radio_parms(struct wl1271 *wl)
  * Poll the mailbox event field until any of the bits in the mask is set or a
  * timeout occurs (WL1271_EVENT_TIMEOUT in msecs)
  */
-static int wl1271_cmd_wait_for_event_or_timeout(struct wl1271 *wl, u32 mask)
+static int wl1271_cmd_wait_for_event_or_timeout(struct wl1271 *wl, u32 mask,
+						bool *timeout)
 {
 	u32 events_vector, event;
-	unsigned long timeout;
+	unsigned long timeout_time;
 	int ret;
 
-	timeout = jiffies + msecs_to_jiffies(WL1271_EVENT_TIMEOUT);
+	*timeout = false;
+
+	timeout_time = jiffies + msecs_to_jiffies(WL1271_EVENT_TIMEOUT);
 
 	do {
-		if (time_after(jiffies, timeout)) {
+		if (time_after(jiffies, timeout_time)) {
 			wl1271_debug(DEBUG_CMD, "timeout waiting for event %d",
 				     (int)mask);
-			return -ETIMEDOUT;
+			*timeout = true;
+			return 0;
 		}
 
 		msleep(1);
@@ -390,9 +394,10 @@ static int wl1271_cmd_wait_for_event_or_timeout(struct wl1271 *wl, u32 mask)
 static int wl1271_cmd_wait_for_event(struct wl1271 *wl, u32 mask)
 {
 	int ret;
+	bool timeout = false;
 
-	ret = wl1271_cmd_wait_for_event_or_timeout(wl, mask);
-	if (ret != 0) {
+	ret = wl1271_cmd_wait_for_event_or_timeout(wl, mask, &timeout);
+	if (ret != 0 || timeout) {
 		wl12xx_queue_recovery_work(wl);
 		return ret;
 	}
@@ -1625,6 +1630,7 @@ int wl12xx_cmd_remove_peer(struct wl1271 *wl, u8 hlid)
 {
 	struct wl12xx_cmd_remove_peer *cmd;
 	int ret;
+	bool timeout = false;
 
 	wl1271_debug(DEBUG_CMD, "cmd remove peer %d", (int)hlid);
 
@@ -1645,12 +1651,16 @@ int wl12xx_cmd_remove_peer(struct wl1271 *wl, u8 hlid)
 		goto out_free;
 	}
 
+	ret = wl1271_cmd_wait_for_event_or_timeout(wl,
+					   PEER_REMOVE_COMPLETE_EVENT_ID,
+					   &timeout);
 	/*
 	 * We are ok with a timeout here. The event is sometimes not sent
-	 * due to a firmware bug.
+	 * due to a firmware bug. In case of another error (like SDIO timeout)
+	 * queue a recovery.
 	 */
-	wl1271_cmd_wait_for_event_or_timeout(wl,
-					     PEER_REMOVE_COMPLETE_EVENT_ID);
+	if (ret)
+		wl12xx_queue_recovery_work(wl);
 
 out_free:
 	kfree(cmd);
