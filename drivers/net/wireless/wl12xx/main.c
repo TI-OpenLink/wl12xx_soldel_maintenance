@@ -5652,10 +5652,38 @@ static void wl12xx_derive_mac_addresses(struct wl1271 *wl,
 	wl->hw->wiphy->addresses = wl->addresses;
 }
 
+int wl12xx_init_pll_clock(struct wl1271 *wl, int *selected_clock)
+{
+	int ret;
+
+	if (wl->chip.id == CHIP_ID_1283_PG20) {
+		ret = wl128x_boot_clk(wl, selected_clock);
+		if (ret < 0)
+			return ret;
+	} else {
+		ret = wl127x_boot_clk(wl);
+		if (ret < 0)
+			return ret;
+	}
+
+	/* Continue the ELP wake up sequence */
+	ret = wl1271_write32(wl, WELP_ARM_COMMAND, WELP_ARM_COMMAND_VAL);
+	if (ret < 0)
+		return ret;
+
+	udelay(500);
+	return ret;
+}
+
 static int wl12xx_get_fuse_mac(struct wl1271 *wl)
 {
 	u32 mac1, mac2;
 	int ret;
+	int selected_clock = -1;
+
+	ret = wl12xx_init_pll_clock(wl, &selected_clock);
+	if (ret < 0)
+		goto out;
 
 	ret = wl1271_set_partition(wl, &wl12xx_part_table[PART_DRPW]);
 	if (ret < 0)

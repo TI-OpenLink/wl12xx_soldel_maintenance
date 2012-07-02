@@ -730,6 +730,7 @@ int wl1271_op_sta_add_locked(struct ieee80211_hw *hw,
 void wl12xx_update_sta_state(struct wl1271 *wl,
 			     struct ieee80211_sta *sta,
 			     enum ieee80211_sta_state state);
+int wl12xx_init_pll_clock(struct wl1271 *wl, int *selected_clock);
 
 #define JOIN_TIMEOUT 5000 /* 5000 milliseconds to join */
 

@@ -682,7 +682,7 @@ static int wl128x_configure_mcs_pll(struct wl1271 *wl, int clk)
  * In cases where TCXO is 32.736MHz or 16.368MHz, the FREF will be used
  * as the WLAN/BT main clock.
  */
-static int wl128x_boot_clk(struct wl1271 *wl, int *selected_clock)
+int wl128x_boot_clk(struct wl1271 *wl, int *selected_clock)
 {
 	u16 sys_clk_cfg;
 	int ret;
@@ -729,7 +729,7 @@ config_mcs_pll:
 	return wl128x_configure_mcs_pll(wl, *selected_clock);
 }
 
-static int wl127x_boot_clk(struct wl1271 *wl)
+int wl127x_boot_clk(struct wl1271 *wl)
 {
 	u32 pause;
 	u32 clk;
@@ -810,22 +810,9 @@ int wl1271_load_firmware(struct wl1271 *wl)
 	u32 tmp, clk;
 	int selected_clock = -1;
 
-	if (wl->chip.id == CHIP_ID_1283_PG20) {
-		ret = wl128x_boot_clk(wl, &selected_clock);
-		if (ret < 0)
-			goto out;
-	} else {
-		ret = wl127x_boot_clk(wl);
-		if (ret < 0)
-			goto out;
-	}
-
-	/* Continue the ELP wake up sequence */
-	ret = wl1271_write32(wl, WELP_ARM_COMMAND, WELP_ARM_COMMAND_VAL);
+	ret = wl12xx_init_pll_clock(wl, &selected_clock);
 	if (ret < 0)
 		goto out;
-
-	udelay(500);
 
 	ret = wl1271_set_partition(wl, &wl12xx_part_table[PART_DRPW]);
 	if (ret < 0)
