@@ -1310,8 +1310,6 @@ static void wl1271_recovery_work(struct work_struct *work)
 
 	wl12xx_read_fwlog_panic(wl);
 
-	wl->watchdog_recovery = false;
-
 	wl12xx_print_recovery(wl);
 
 	BUG_ON(bug_on_recovery &&
@@ -1356,6 +1354,10 @@ static void wl1271_recovery_work(struct work_struct *work)
 	ieee80211_wake_queues(wl->hw);
 	return;
 out_unlock:
+	wl->watchdog_recovery = false;
+	if (test_and_clear_bit(WL1271_FLAG_RECOVERY_IN_PROGRESS,
+			       &wl->flags))
+		wl1271_enable_interrupts(wl);
 	mutex_unlock(&wl->mutex);
 }
 
