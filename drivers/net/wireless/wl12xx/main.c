@@ -405,7 +405,7 @@ static char *tcxo_param;
 static void __wl1271_op_remove_interface(struct wl1271 *wl,
 					 struct ieee80211_vif *vif,
 					 bool reset_tx_queues);
-static void wl1271_op_stop(struct ieee80211_hw *hw);
+static void wl1271_op_stop_locked(struct wl1271 *wl);
 static void wl1271_free_ap_keys(struct wl1271 *wl, struct wl12xx_vif *wlvif);
 
 static DEFINE_MUTEX(wl_list_mutex);
@@ -1191,7 +1191,7 @@ void wl12xx_queue_recovery_work(struct wl1271 *wl)
 
 	/* Avoid a recursive recovery */
 	if (!test_and_set_bit(WL1271_FLAG_RECOVERY_IN_PROGRESS, &wl->flags)) {
-		wl1271_disable_interrupts_nosync(wl);
+		wlcore_disable_interrupts_nosync(wl);
 		ieee80211_queue_work(wl->hw, &wl->recovery_work);
 	}
 }
@@ -1342,8 +1342,7 @@ static void wl1271_recovery_work(struct work_struct *work)
 		vif = wl12xx_wlvif_to_vif(wlvif);
 		__wl1271_op_remove_interface(wl, vif, false);
 	}
-	mutex_unlock(&wl->mutex);
-	wl1271_op_stop(wl->hw);
+	wl1271_op_stop_locked(wl);
 
 	ieee80211_restart_hw(wl->hw);
 
@@ -1352,7 +1351,6 @@ static void wl1271_recovery_work(struct work_struct *work)
 	 * to restart the HW.
 	 */
 	ieee80211_wake_queues(wl->hw);
-	return;
 out_unlock:
 	wl->watchdog_recovery = false;
 	if (test_and_clear_bit(WL1271_FLAG_RECOVERY_IN_PROGRESS,
@@ -2231,33 +2229,15 @@ static int wl1271_op_start(struct ieee80211_hw *hw)
 	return 0;
 }
 
-static void wl1271_op_stop(struct ieee80211_hw *hw)
+static void wl1271_op_stop_locked(struct wl1271 *wl)
 {
-	struct wl1271 *wl = hw->priv;
 	int i;
 
-	wl1271_debug(DEBUG_MAC80211, "mac80211 stop");
-
-	/*
-	 * Interrupts must be disabled before setting the state to OFF.
-	 * Otherwise, the interrupt handler might be called and exit without
-	 * reading the interrupt status.
-	 */
-	wl1271_disable_interrupts(wl);
-	mutex_lock(&wl->mutex);
 	if (wl->state == WL1271_STATE_OFF) {
 		if (test_and_clear_bit(WL1271_FLAG_RECOVERY_IN_PROGRESS,
 				       &wl->flags))
 			wl1271_enable_interrupts(wl);
 
-		mutex_unlock(&wl->mutex);
-
-		/*
-		 * This will not necessarily enable interrupts as interrupts
-		 * may have been disabled when op_stop was called. It will,
-		 * however, balance the above call to disable_interrupts().
-		 */
-		wl1271_enable_interrupts(wl);
 		return;
 	}
 
@@ -2266,12 +2246,19 @@ static void wl1271_op_stop(struct ieee80211_hw *hw)
 	 * functions don't perform further work.
 	 */
 	wl->state = WL1271_STATE_OFF;
+
+	/*
+	 * Use the nosync variant to disable interrupts, so the mutex could be
+	 * held while doing so without deadlocking.
+	 */
+	wlcore_disable_interrupts_nosync(wl);
 	mutex_unlock(&wl->mutex);
 
 	mutex_lock(&wl_list_mutex);
 	list_del(&wl->list);
 	mutex_unlock(&wl_list_mutex);
 
+	wlcore_synchronize_interrupts(wl);
 	wl1271_flush_deferred_work(wl);
 	cancel_delayed_work_sync(&wl->scan_complete_work);
 	cancel_work_sync(&wl->netstack_work);
@@ -2335,6 +2322,17 @@ static void wl1271_op_stop(struct ieee80211_hw *hw)
 	wl->tx_res_if = NULL;
 	kfree(wl->target_mem_map);
 	wl->target_mem_map = NULL;
+}
+
+static void wl1271_op_stop(struct ieee80211_hw *hw)
+{
+	struct wl1271 *wl = hw->priv;
+
+	wl1271_debug(DEBUG_MAC80211, "mac80211 stop");
+
+	mutex_lock(&wl->mutex);
+
+	wl1271_op_stop_locked(wl);
 
 	mutex_unlock(&wl->mutex);
 }

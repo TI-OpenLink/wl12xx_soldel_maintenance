@@ -48,8 +48,9 @@ extern struct wl1271_partition_set wl12xx_part_table[PART_TABLE_LEN];
 struct wl1271;
 
 void wl1271_disable_interrupts(struct wl1271 *wl);
-void wl1271_disable_interrupts_nosync(struct wl1271 *wl);
+void wlcore_disable_interrupts_nosync(struct wl1271 *wl);
 void wl1271_enable_interrupts(struct wl1271 *wl);
+void wlcore_synchronize_interrupts(struct wl1271 *wl);
 
 void wl1271_io_reset(struct wl1271 *wl);
 void wl1271_io_init(struct wl1271 *wl);
