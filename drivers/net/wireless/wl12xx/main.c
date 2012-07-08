@@ -1925,7 +1925,18 @@ int wl1271_convert_wowlan_pattern_to_rx_filter(
 		i = j;
 	}
 
-	filter->action = FILTER_SIGNAL;
+	switch (p->action) {
+	case NL80211_WOWLAN_ACTION_ALLOW:
+		filter->action = FILTER_SIGNAL;
+		break;
+	case NL80211_WOWLAN_ACTION_DROP:
+		filter->action = FILTER_DROP;
+		break;
+	default:
+		wl1271_warning("Bad wowlan action: %d", p->action);
+		ret = -EINVAL;
+		goto err;
+	}
 
 	*f = filter;
 	return 0;
