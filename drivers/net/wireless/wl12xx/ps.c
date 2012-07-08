@@ -100,7 +100,7 @@ void wl1271_ps_elp_sleep(struct wl1271 *wl)
 	if (wl->conf.conn.forced_ps)
 		timeout = ELP_ENTRY_DELAY;
 	else
-		timeout = wl->conf.conn.dynamic_ps_timeout;
+		timeout = wl->conf.conn.elp_timeout;
 
 	ieee80211_queue_delayed_work(wl->hw, &wl->elp_work,
 				     msecs_to_jiffies(timeout));
