@@ -303,7 +303,7 @@ struct ap_peers {
 	struct ieee80211_hw *hw;
 };
 
-#define WL1271_MAX_RX_FILTERS 5
+#define WL1271_MAX_RX_FILTERS 7
 #define WL1271_RX_FILTER_MAX_FIELDS 8
 
 #define WL1271_RX_FILTER_ETH_HEADER_SIZE 14
