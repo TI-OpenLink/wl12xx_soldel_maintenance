@@ -984,6 +984,7 @@ static int wl12xx_irq_locked(struct wl1271 *wl)
 			wl->watchdog_recovery = true;
 
 			/* restarting the chip. ignore any other interrupt. */
+			ret = -EIO;
 			goto out;
 		}
 
