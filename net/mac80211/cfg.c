@@ -617,11 +617,10 @@ static int ieee80211_config_beacon(struct ieee80211_sub_if_data *sdata,
 
 	sdata->vif.bss_conf.dtim_period = new->dtim_period;
 
-	RCU_INIT_POINTER(sdata->u.ap.beacon, new);
+	rcu_assign_pointer(sdata->u.ap.beacon, new);
 
-	synchronize_rcu();
-
-	kfree(old);
+	if (old)
+		kfree_rcu(old, rcu_head);
 
 	err = ieee80211_set_probe_resp(sdata, params->probe_resp,
 				       params->probe_resp_len);
