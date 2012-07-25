@@ -504,27 +504,53 @@ static void ieee80211_config_ap_ssid(struct ieee80211_sub_if_data *sdata,
 		(params->hidden_ssid != NL80211_HIDDEN_SSID_NOT_IN_USE);
 }
 
+static struct probe_resp *ieee80211_probe_resp_alloc(size_t resp_len)
+{
+	struct probe_resp *probe_resp;
+
+	probe_resp = kzalloc(sizeof(struct probe_resp), GFP_KERNEL);
+	if (!probe_resp)
+		goto fail;
+
+	probe_resp->skb = dev_alloc_skb(resp_len);
+	if (!probe_resp->skb)
+		goto fail;
+
+	return probe_resp;
+fail:
+	kfree(probe_resp);
+	return NULL;
+}
+
+static void ieee80211_probe_resp_rcu_free(struct rcu_head *head)
+{
+	struct probe_resp *probe_resp;
+
+	probe_resp = container_of(head, struct probe_resp, rcu_head);
+	ieee80211_free_probe_resp(probe_resp);
+}
+
 static int ieee80211_set_probe_resp(struct ieee80211_sub_if_data *sdata,
 				    u8 *resp, size_t resp_len)
 {
-	struct sk_buff *new, *old;
+	struct probe_resp *new, *old;
 
 	if (!resp || !resp_len)
 		return -EINVAL;
 
 	old = rtnl_dereference(sdata->u.ap.probe_resp);
 
-	new = dev_alloc_skb(resp_len);
+	new = ieee80211_probe_resp_alloc(resp_len);
 	if (!new)
 		return -ENOMEM;
 
-	memcpy(skb_put(new, resp_len), resp, resp_len);
+	memcpy(skb_put(new->skb, resp_len), resp, resp_len);
 
 	rcu_assign_pointer(sdata->u.ap.probe_resp, new);
-	synchronize_rcu();
 
 	if (old)
-		dev_kfree_skb(old);
+		call_rcu(&(old->rcu_head),
+			 ieee80211_probe_resp_rcu_free);
 
 	return 0;
 }
