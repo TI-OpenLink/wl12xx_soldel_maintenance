@@ -236,6 +236,9 @@ struct probe_resp {
 
 static inline void ieee80211_free_probe_resp(struct probe_resp *probe_resp)
 {
+	if (!probe_resp)
+		return;
+
 	dev_kfree_skb(probe_resp->skb);
 	kfree(probe_resp);
 }
