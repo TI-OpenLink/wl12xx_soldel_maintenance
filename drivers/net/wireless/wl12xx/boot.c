@@ -376,11 +376,16 @@ static int wl1271_boot_enable_interrupts(struct wl1271 *wl)
 	ret = wl1271_write32(wl, ACX_REG_INTERRUPT_MASK,
 			     WL1271_ACX_INTR_ALL & ~(WL1271_INTR_MASK));
 	if (ret < 0)
-		goto out;
+		goto disable_interrupts;
 
 	ret = wl1271_write32(wl, HI_CFG, HI_CFG_DEF_VAL);
+	if (ret < 0)
+		goto disable_interrupts;
 
-out:
+	return ret;
+
+disable_interrupts:
+	wl1271_disable_interrupts(wl);
 	return ret;
 }
 
@@ -927,6 +932,13 @@ int wl1271_boot(struct wl1271 *wl)
 		goto out;
 
 	ret = wl1271_event_mbox_config(wl);
+	if (ret < 0)
+		goto disable_interrupts;
+
+	return ret;
+
+disable_interrupts:
+	wl1271_disable_interrupts(wl);
 
 out:
 	return ret;
