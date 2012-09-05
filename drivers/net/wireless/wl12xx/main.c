@@ -6156,7 +6156,35 @@ static struct ieee80211_hw *wl1271_alloc_hw(void)
 		goto err_dummy_packet;
 	}
 
+	wl->rx_mem_pool_addr = kmalloc(sizeof(*wl->rx_mem_pool_addr),
+				       GFP_KERNEL);
+	if (!wl->rx_mem_pool_addr) {
+		ret = -ENOMEM;
+		goto err_fwlog;
+	}
+
+	wl->mbox = kmalloc(sizeof(*wl->mbox), GFP_KERNEL);
+	if (!wl->mbox) {
+		ret = -ENOMEM;
+		goto err_pool_addr;
+	}
+
+	wl->buffer_32 = kmalloc(sizeof(*wl->buffer_32), GFP_KERNEL);
+	if (!wl->buffer_32) {
+		ret = -ENOMEM;
+		goto err_mbox;
+	}
+
 	return hw;
+
+err_mbox:
+	kfree(wl->mbox);
+
+err_pool_addr:
+	kfree(wl->rx_mem_pool_addr);
+
+err_fwlog:
+	free_page((unsigned long)wl->fwlog);
 
 err_dummy_packet:
 	dev_kfree_skb(wl->dummy_packet);
@@ -6194,6 +6222,9 @@ static int wl1271_free_hw(struct wl1271 *wl)
 	device_remove_file(wl->dev, &dev_attr_hw_pg_ver);
 
 	device_remove_file(wl->dev, &dev_attr_bt_coex_state);
+	kfree(wl->buffer_32);
+	kfree(wl->mbox);
+	kfree(wl->rx_mem_pool_addr);
 	free_page((unsigned long)wl->fwlog);
 	dev_kfree_skb(wl->dummy_packet);
 	free_pages((unsigned long)wl->aggr_buf,

@@ -89,15 +89,19 @@ static void wl1271_parse_fw_ver(struct wl1271 *wl)
 
 static int wl1271_boot_fw_version(struct wl1271 *wl)
 {
-	struct wl1271_static_data static_data;
+	struct wl1271_static_data *static_data;
 	int ret;
 
-	ret = wl1271_read(wl, wl->cmd_box_addr, &static_data,
-			  sizeof(static_data), false);
-	if (ret < 0)
-		return ret;
+	static_data = kmalloc(sizeof(*static_data), GFP_KERNEL);
+	if (!static_data)
+		return -ENOMEM;
 
-	strncpy(wl->chip.fw_ver_str, static_data.fw_version,
+	ret = wl1271_read(wl, wl->cmd_box_addr, static_data,
+			  sizeof(*static_data), false);
+	if (ret < 0)
+		goto out;
+
+	strncpy(wl->chip.fw_ver_str, static_data->fw_version,
 		sizeof(wl->chip.fw_ver_str));
 
 	/* make sure the string is NULL-terminated */
@@ -105,7 +109,9 @@ static int wl1271_boot_fw_version(struct wl1271 *wl)
 
 	wl1271_parse_fw_ver(wl);
 
-	return 0;
+out:
+	kfree(static_data);
+	return ret;
 }
 
 static int wl1271_boot_upload_firmware_chunk(struct wl1271 *wl, void *buf,

@@ -372,15 +372,13 @@ static int wl1271_cmd_wait_for_event_or_timeout(struct wl1271 *wl, u32 mask,
 		msleep(1);
 
 		/* read from both event fields */
-		ret = wl1271_read(wl, wl->mbox_ptr[0], &events_vector,
-				  sizeof(events_vector), false);
+		ret = wl1271_read32(wl, wl->mbox_ptr[0], &events_vector);
 		if (ret < 0)
 			return ret;
 
 		event = events_vector & mask;
 
-		ret = wl1271_read(wl, wl->mbox_ptr[1], &events_vector,
-				  sizeof(events_vector), false);
+		ret = wl1271_read32(wl, wl->mbox_ptr[1], &events_vector);
 		if (ret < 0)
 			return ret;
 

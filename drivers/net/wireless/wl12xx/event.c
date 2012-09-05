@@ -324,7 +324,6 @@ int wl1271_event_mbox_config(struct wl1271 *wl)
 
 int wl1271_event_handle(struct wl1271 *wl, u8 mbox_num)
 {
-	struct event_mailbox mbox;
 	int ret;
 
 	wl1271_debug(DEBUG_EVENT, "EVENT on mbox %d", mbox_num);
@@ -333,13 +332,13 @@ int wl1271_event_handle(struct wl1271 *wl, u8 mbox_num)
 		return -EINVAL;
 
 	/* first we read the mbox descriptor */
-	ret = wl1271_read(wl, wl->mbox_ptr[mbox_num], &mbox,
+	ret = wl1271_read(wl, wl->mbox_ptr[mbox_num], wl->mbox,
 			  sizeof(struct event_mailbox), false);
 	if (ret < 0)
 		return ret;
 
 	/* process the descriptor */
-	ret = wl1271_event_process(wl, &mbox);
+	ret = wl1271_event_process(wl, wl->mbox);
 	if (ret < 0)
 		return ret;
 
